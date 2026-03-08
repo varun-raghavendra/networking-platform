@@ -19,12 +19,12 @@ Input format:
 - contact_name: Full name of the contact
 - interaction_summary: Summary of the conversation
 - company: Company the contact belongs to
-- Optional: follow_up_time, meeting_time, meeting_context
+- Optional: email, phone, country, last_contacted, follow_up_time, meeting_time, meeting_context
 
 You have these tools. Use them as needed:
 
-1. upsert_contact: Always call first to create/update the contact from the prompt. Use interaction_summary for interaction_summary param.
-2. record_interaction: Call after upsert_contact to record the interaction.
+1. upsert_contact: Always call first to create/update the contact. Use interaction_summary param. Returns {"id": "uuid"}.
+2. record_interaction: Call IMMEDIATELY after upsert_contact. You MUST pass contact_id = the exact "id" string from the upsert_contact result. Pass summary = interaction_summary.
 3. decide_follow_up: Decide if a follow-up should be scheduled. If the interaction mentions a specific time, use it. Otherwise default to 2 days.
 4. schedule_follow_up: Schedule follow-up on calendar. Use contact_name and summary. Pass scheduled_time if specified.
 5. decide_meeting: Decide if a meeting needs to be scheduled based on the interaction.
@@ -149,6 +149,10 @@ class OrchestratorAgent:
         contact_name: str,
         interaction_summary: str,
         company: str,
+        email: str | None = None,
+        phone: str | None = None,
+        country: str | None = None,
+        last_contacted: str | None = None,
         follow_up_time: str | None = None,
         meeting_time: str | None = None,
         meeting_context: str | None = None,
@@ -159,6 +163,10 @@ class OrchestratorAgent:
 - contact_name: {contact_name}
 - interaction_summary: {interaction_summary}
 - company: {company}
+- email: {email or 'not specified'}
+- phone: {phone or 'not specified'}
+- country: {country or 'not specified'}
+- last_contacted: {last_contacted or 'not specified'}
 - follow_up_time: {follow_up_time or 'not specified'}
 - meeting_time: {meeting_time or 'not specified'}
 - meeting_context: {meeting_context or 'none'}

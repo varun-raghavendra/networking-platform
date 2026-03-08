@@ -187,6 +187,23 @@
   max-width: 500px;
 }
 
+.selectRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.selectRow .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.flowToggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
 .form label {
   font-size: 0.9rem;
   color: #8b98a5;
@@ -219,6 +236,22 @@
 .reminders h3 {
   margin: 0 0 0.5rem 0;
   font-size: 0.95rem;
+}
+
+.inlineInput {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  width: 100%;
+  min-width: 80px;
+  border: 1px solid #2f3336;
+  border-radius: 4px;
+  background: #0f1419;
+  color: #e7e9ea;
+}
+
+.editActions {
+  display: flex;
+  gap: 0.25rem;
 }
 
 .reminders ul {

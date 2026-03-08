@@ -36,9 +36,14 @@ app.add_middleware(
 
 # --- Request/Response models ---
 class PromptInput(BaseModel):
-    contact_name: str
+    contact_id: str | None = None  # For existing contact flow
+    contact_name: str | None = None  # Required for new contact
     interaction_summary: str
-    company: str
+    company: str | None = None  # Required for new contact
+    email: str | None = None  # New contact only
+    phone: str | None = None  # New contact only
+    country: str | None = None  # New contact only, default United States
+    last_contacted: str | None = None
     follow_up_time: str | None = None
     meeting_time: str | None = None
     meeting_context: str | None = None
@@ -53,6 +58,12 @@ class UpsertContactInput(BaseModel):
     notes: str | None = None
     interaction_summary: str | None = None
     tags: list[str] | None = None
+
+
+class ContactUpdateInput(BaseModel):
+    country: str | None = None
+    phone: str | None = None
+    email: str | None = None
 
 
 class InteractionInput(BaseModel):
@@ -70,14 +81,38 @@ class TodoCreateInput(BaseModel):
 @app.post("/api/prompts")
 async def process_prompt(input: PromptInput):
     """Process interaction prompt - orchestrate agent and tools."""
-    logger.info("Processing prompt for contact %s", input.contact_name)
+    contact_name = input.contact_name
+    company = input.company
+    email = input.email
+    phone = input.phone
+    country = input.country
+
+    if input.contact_id:
+        async with get_session() as session:
+            c = await contacts.get_contact(session, UUID(input.contact_id))
+            if not c:
+                raise HTTPException(404, "Contact not found")
+            contact_name = c.get("full_name") or ""
+            company = c.get("company_name") or ""
+            email = c.get("email")
+            phone = c.get("phone")
+            country = c.get("country")
+
+    if not contact_name or not company:
+        raise HTTPException(400, "contact_name and company required for new contact; or select existing contact")
+
+    logger.info("Processing prompt for contact %s", contact_name)
     settings = get_settings()
     executor = ToolExecutor(settings.mcp_calendar_url)
     agent = OrchestratorAgent(executor)
     result = await agent.process_prompt(
-        contact_name=input.contact_name,
+        contact_name=contact_name,
         interaction_summary=input.interaction_summary,
-        company=input.company,
+        company=company,
+        email=email,
+        phone=phone,
+        country=country,
+        last_contacted=input.last_contacted,
         follow_up_time=input.follow_up_time,
         meeting_time=input.meeting_time,
         meeting_context=input.meeting_context,
@@ -106,6 +141,21 @@ async def get_contact(contact_id: UUID):
         if not c:
             raise HTTPException(404, "Contact not found")
         return c
+
+
+@app.patch("/api/contacts/{contact_id}")
+async def update_contact(contact_id: UUID, input: ContactUpdateInput):
+    """Update contact country, phone, email only. last_contacted must go through prompt."""
+    async with get_session() as session:
+        result = await contacts.update_contact_fields(
+            session, contact_id,
+            country=input.country,
+            phone=input.phone,
+            email=input.email,
+        )
+        if not result:
+            raise HTTPException(404, "Contact not found")
+        return result
 
 
 @app.get("/api/contacts/{contact_id}/interactions")

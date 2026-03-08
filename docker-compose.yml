@@ -52,7 +52,7 @@ services:
       SCHEDULE_END_HOUR: "22"
       DEFAULT_MEETING_DURATION_MINUTES: "10"
     volumes:
-      - ./mcp-servers/calendar/secrets:/app/secrets:ro
+      - ./mcp-servers/calendar/secrets:/app/secrets
     depends_on:
       postgres:
         condition: service_healthy

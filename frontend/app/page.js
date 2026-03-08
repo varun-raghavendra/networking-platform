@@ -33,6 +33,96 @@ export default function Home() {
   )
 }
 
+function ContactRow({ contact, getWarmthClass, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [country, setCountry] = useState(contact.country || '')
+  const [phone, setPhone] = useState(contact.phone || '')
+  const [email, setEmail] = useState(contact.email || '')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(
+        (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + `/api/contacts/${contact.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country: country || null, phone: phone || null, email: email || null }),
+        }
+      )
+      if (res.ok) {
+        setEditing(false)
+        onSaved()
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const cancel = () => {
+    setCountry(contact.country || '')
+    setPhone(contact.phone || '')
+    setEmail(contact.email || '')
+    setEditing(false)
+  }
+
+  return (
+    <tr className={getWarmthClass(contact.last_contacted_at)}>
+      <td>{contact.full_name}</td>
+      {editing ? (
+        <>
+          <td>
+            <input
+              className={styles.inlineInput}
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="Country"
+            />
+          </td>
+          <td>
+            <input
+              className={styles.inlineInput}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Phone"
+            />
+          </td>
+          <td>
+            <input
+              className={styles.inlineInput}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+            />
+          </td>
+        </>
+      ) : (
+        <>
+          <td>{contact.country || '-'}</td>
+          <td>{contact.phone || '-'}</td>
+          <td>{contact.email || '-'}</td>
+        </>
+      )}
+      <td>{contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleString() : '-'}</td>
+      <td>{contact.last_interaction_summary || '-'}</td>
+      <td>
+        {editing ? (
+          <span className={styles.editActions}>
+            <button onClick={save} disabled={saving} className={styles.btnSmall}>Save</button>
+            <button onClick={cancel} disabled={saving} className={styles.btnSmall}>Cancel</button>
+          </span>
+        ) : (
+          <button onClick={() => setEditing(true)} className={styles.btnSmall} title="Edit country, phone, email">Edit</button>
+        )}
+      </td>
+    </tr>
+  )
+}
+
 function WarmContactsTab() {
   const [contacts, setContacts] = useState([])
   const [reminders, setReminders] = useState([])
@@ -109,18 +199,17 @@ function WarmContactsTab() {
             <th>Email</th>
             <th>Last Contacted</th>
             <th>Summary</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {contacts.map((c) => (
-            <tr key={c.id} className={getWarmthClass(c.last_contacted_at)}>
-              <td>{c.full_name}</td>
-              <td>{c.country || '-'}</td>
-              <td>{c.phone || '-'}</td>
-              <td>{c.email || '-'}</td>
-              <td>{c.last_contacted_at ? new Date(c.last_contacted_at).toLocaleString() : '-'}</td>
-              <td>{c.last_interaction_summary || '-'}</td>
-            </tr>
+            <ContactRow
+              key={c.id}
+              contact={c}
+              getWarmthClass={getWarmthClass}
+              onSaved={fetchContacts}
+            />
           ))}
         </tbody>
       </table>
@@ -208,37 +297,70 @@ function TodosTab() {
 }
 
 function InputPromptTab() {
+  const [flow, setFlow] = useState('existing')
+  const [contacts, setContacts] = useState([])
+  const [contactsLoading, setContactsLoading] = useState(false)
+  const [selectedContactId, setSelectedContactId] = useState('')
   const [contactName, setContactName] = useState('')
   const [summary, setSummary] = useState('')
   const [company, setCompany] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [country, setCountry] = useState('United States')
   const [followUp, setFollowUp] = useState('')
   const [meetingTime, setMeetingTime] = useState('')
   const [meetingContext, setMeetingContext] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
+  const fetchContacts = async () => {
+    setContactsLoading(true)
+    try {
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/contacts?limit=100')
+      const d = await res.json()
+      if (!res.ok) {
+        console.error('Failed to fetch contacts:', d)
+        return
+      }
+      setContacts(d.contacts || [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setContactsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (flow === 'existing') fetchContacts()
+  }, [flow])
+
   const submit = async () => {
-    if (!contactName || !summary || !company) {
-      alert('Contact name, interaction summary, and company are required.')
+    if (!summary) {
+      alert('Interaction summary is required.')
+      return
+    }
+    if (flow === 'existing' && !selectedContactId) {
+      alert('Please select a contact.')
+      return
+    }
+    if (flow === 'new' && (!contactName || !company)) {
+      alert('Contact name and company are required for new contact.')
       return
     }
     setLoading(true)
     setResult(null)
     try {
+      const body = flow === 'existing'
+        ? { contact_id: selectedContactId, interaction_summary: summary, follow_up_time: followUp || null, meeting_time: meetingTime || null, meeting_context: meetingContext || null }
+        : { contact_name: contactName, company, interaction_summary: summary, email: email || null, phone: phone || null, country: country || 'United States', follow_up_time: followUp || null, meeting_time: meetingTime || null, meeting_context: meetingContext || null }
       const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contact_name: contactName,
-          interaction_summary: summary,
-          company,
-          follow_up_time: followUp || null,
-          meeting_time: meetingTime || null,
-          meeting_context: meetingContext || null,
-        }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       setResult(data)
+      if (flow === 'new' && data.status === 'completed') fetchContacts()
     } catch (e) {
       setResult({ status: 'failed', error: String(e) })
     } finally {
@@ -249,12 +371,48 @@ function InputPromptTab() {
   return (
     <div className={styles.tabContent}>
       <div className={styles.form}>
-        <label>Contact name *</label>
-        <input value={contactName} onChange={(e) => setContactName(e.target.value)} className={styles.input} />
+        <label>Flow</label>
+        <div className={styles.flowToggle}>
+          <button type="button" className={flow === 'existing' ? styles.tabActive : styles.tab} onClick={() => setFlow('existing')}>
+            Existing contact
+          </button>
+          <button type="button" className={flow === 'new' ? styles.tabActive : styles.tab} onClick={() => setFlow('new')}>
+            New contact
+          </button>
+        </div>
+
+        {flow === 'existing' ? (
+          <>
+            <label>Select contact *</label>
+            <div className={styles.selectRow}>
+              <select value={selectedContactId} onChange={(e) => setSelectedContactId(e.target.value)} className={styles.select}>
+                <option value="">-- Select contact --</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>{c.full_name} {c.company_name ? `(${c.company_name})` : ''}</option>
+                ))}
+              </select>
+              <button type="button" onClick={fetchContacts} disabled={contactsLoading} className={styles.btnSmall}>
+                {contactsLoading ? '...' : 'Refresh'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label>Contact name *</label>
+            <input value={contactName} onChange={(e) => setContactName(e.target.value)} className={styles.input} />
+            <label>Company *</label>
+            <input value={company} onChange={(e) => setCompany(e.target.value)} className={styles.input} />
+            <label>Email (optional)</label>
+            <input type="email" placeholder="contact@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={styles.input} />
+            <label>Phone (optional)</label>
+            <input type="tel" placeholder="+1 234 567 8900" value={phone} onChange={(e) => setPhone(e.target.value)} className={styles.input} />
+            <label>Country (optional)</label>
+            <input placeholder="United States" value={country} onChange={(e) => setCountry(e.target.value)} className={styles.input} />
+          </>
+        )}
+
         <label>Interaction summary *</label>
-        <textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={4} className={styles.input} />
-        <label>Company *</label>
-        <input value={company} onChange={(e) => setCompany(e.target.value)} className={styles.input} />
+        <textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={4} className={styles.input} placeholder="Summary of the conversation" />
         <label>Follow-up time (optional)</label>
         <input placeholder="e.g. in 2 days, next Tuesday 3pm" value={followUp} onChange={(e) => setFollowUp(e.target.value)} className={styles.input} />
         <label>Meeting time (optional)</label>

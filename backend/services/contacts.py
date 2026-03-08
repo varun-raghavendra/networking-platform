@@ -264,6 +264,38 @@ async def get_contact_interactions(
     return [dict(row._mapping) for row in r.fetchall()]
 
 
+async def update_contact_fields(
+    session: AsyncSession,
+    contact_id: UUID,
+    country: Optional[str] = None,
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+) -> Optional[dict]:
+    """Update only country, phone, email. last_contacted must go through prompt."""
+    from sqlalchemy import text
+
+    updates = ["updated_at = :now"]
+    params = {"id": contact_id, "now": datetime.utcnow()}
+    if country is not None:
+        updates.append("country = :country")
+        params["country"] = country or None
+    if phone is not None:
+        updates.append("phone = :phone")
+        params["phone"] = phone or None
+    if email is not None:
+        updates.append("email = :email")
+        params["email"] = email or None
+
+    if len(updates) == 1:
+        return await get_contact(session, contact_id)
+
+    await session.execute(
+        text(f"UPDATE contacts SET {', '.join(updates)} WHERE id = :id"), params
+    )
+    logger.info("Updated contact fields for %s", contact_id)
+    return await get_contact(session, contact_id)
+
+
 async def get_stale_contacts(
     session: AsyncSession, days: int = 90
 ) -> list[dict]:
