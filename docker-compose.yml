@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: networking
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d networking"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/networking
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MCP_CALENDAR_URL: http://mcp-calendar:8001/mcp
+      MCP_CONTACTS_URL: http://mcp-contacts:8002/mcp
+      MCP_TODOS_URL: http://mcp-todos:8003/mcp
+      GOOGLE_CALENDAR_EMAIL: varunraghavendra99@gmail.com
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-calendar:
+        condition: service_started
+      mcp-contacts:
+        condition: service_started
+      mcp-todos:
+        condition: service_started
+
+  mcp-calendar:
+    build:
+      context: .
+      dockerfile: mcp-servers/calendar/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      GOOGLE_CREDENTIALS_PATH: /app/secrets/credentials.json
+      GOOGLE_TOKEN_PATH: /app/secrets/token.json
+      GOOGLE_CALENDAR_EMAIL: varunraghavendra99@gmail.com
+      SCHEDULE_START_HOUR: "17"
+      SCHEDULE_END_HOUR: "22"
+      DEFAULT_MEETING_DURATION_MINUTES: "10"
+    volumes:
+      - ./mcp-servers/calendar/secrets:/app/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mcp-contacts:
+    build:
+      context: .
+      dockerfile: mcp-servers/contacts/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/networking
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mcp-todos:
+    build:
+      context: .
+      dockerfile: mcp-servers/todos/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/networking
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

@@ -1,0 +1,229 @@
+.container {
+  min-height: 100vh;
+  background: #0f1419;
+  color: #e7e9ea;
+}
+
+.header {
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #2f3336;
+}
+
+.title {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tab, .tabActive {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: #1a1f26;
+  color: #8b98a5;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.tab:hover {
+  background: #2f3336;
+  color: #e7e9ea;
+}
+
+.tabActive {
+  background: #1d9bf0;
+  color: #fff;
+}
+
+.main {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.search, .input, .select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #2f3336;
+  border-radius: 6px;
+  background: #1a1f26;
+  color: #e7e9ea;
+  font-size: 0.9rem;
+  min-width: 200px;
+}
+
+.input, .select {
+  width: 100%;
+  max-width: 400px;
+}
+
+.btn, .btnSecondary, .btnPrimary, .btnSmall {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn, .btnPrimary {
+  background: #1d9bf0;
+  color: #fff;
+}
+
+.btn:hover, .btnPrimary:hover {
+  background: #1a8cd8;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  background: #2f3336;
+  color: #e7e9ea;
+}
+
+.btnSecondary:hover {
+  background: #3d4146;
+}
+
+.btnSmall {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th, .table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #2f3336;
+}
+
+.table th {
+  color: #8b98a5;
+  font-weight: 600;
+}
+
+.table tbody tr:hover {
+  background: #1a1f26;
+}
+
+.hot {
+  border-left: 4px solid #00ba7c;
+}
+
+.warm {
+  border-left: 4px solid #ffad1f;
+}
+
+.cool {
+  border-left: 4px solid #7856ff;
+}
+
+.cold {
+  border-left: 4px solid #8b98a5;
+}
+
+.todoList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.todoItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  background: #1a1f26;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.todoDesc {
+  margin: 0.25rem 0 0 0;
+  color: #8b98a5;
+  font-size: 0.85rem;
+}
+
+.todoContact {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #1d9bf0;
+}
+
+.badge {
+  font-size: 0.8rem;
+  color: #00ba7c;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 500px;
+}
+
+.form label {
+  font-size: 0.9rem;
+  color: #8b98a5;
+}
+
+.result {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #1a1f26;
+  border-radius: 8px;
+}
+
+.result pre {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.8rem;
+  overflow-x: auto;
+}
+
+.empty {
+  color: #8b98a5;
+}
+
+.reminders {
+  padding: 1rem;
+  background: #1a1f26;
+  border-radius: 8px;
+  border-left: 4px solid #ffad1f;
+}
+
+.reminders h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.reminders ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  color: #8b98a5;
+}
