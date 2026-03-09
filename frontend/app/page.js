@@ -84,6 +84,9 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
   const followUpHours = contact.next_follow_up_at
     ? Math.round((new Date(contact.next_follow_up_at) - Date.now()) / (1000 * 60 * 60))
     : null
+  const followUpDisplay = followUpHours != null
+    ? (followUpHours > 24 ? `${Math.round(followUpHours / 24)}d` : `${followUpHours}h`)
+    : '-'
 
   return (
     <tr style={getWarmthStyle(contact.last_contacted_at)}>
@@ -113,7 +116,7 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
           (contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleString() : '-')
         )}
       </td>
-      <td>{followUpHours != null ? `${followUpHours}h` : '-'}</td>
+      <td>{followUpDisplay}</td>
       <td>{contact.last_interaction_summary || '-'}</td>
       <td>
         {editing ? (
@@ -204,7 +207,7 @@ function WarmContactsTab() {
             <th>Contact</th>
             <th>Country</th>
             <th>Last Contacted</th>
-            <th>Follow up (hrs)</th>
+            <th>Follow up</th>
             <th>Summary</th>
             <th></th>
           </tr>
