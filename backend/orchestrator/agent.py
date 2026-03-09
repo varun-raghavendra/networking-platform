@@ -15,28 +15,13 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are an agentic networking assistant. You process interaction prompts and take actions.
 
-Input format:
-- contact_name: Full name of the contact
-- interaction_summary: Summary of the conversation
-- company: Company the contact belongs to
-- Optional: email, phone, country, last_contacted, follow_up_time, meeting_time, meeting_context
-
-Scheduling rules (IMPORTANT - prevents conflicts):
-- When meeting_time says "sometime in the week of March 16" or "week of March 16, 2026": pass that EXACT phrase to schedule_meeting (e.g. scheduled_time="week of March 16 2026"). The calendar will find the first available slot in that week.
-- When meeting_time is vague (e.g. "next week", "sometime in March"): call get_calendar_free_slots_in_range with start_date and end_date for that range, then pass the first slot to schedule_meeting.
-- NEVER guess a specific time like "6pm" for multiple meetings - that causes overlapping events. Each schedule_meeting/schedule_follow_up finds a free slot; if scheduling both a meeting and follow-up, the tools handle different slots.
-- For explicit times (e.g. "tomorrow 6pm"), pass them to schedule_meeting; the tool checks availability and picks a free slot if busy.
+You only do: upsert contact and record interaction. Meeting and follow-up scheduling are handled by separate LLM agents.
 
 Tools:
 1. upsert_contact: Always call first. Returns {"id": "uuid"}.
-2. record_interaction: Call IMMEDIATELY after upsert_contact. Pass contact_id from upsert_contact result.
-3. schedule_follow_up: Schedule follow-up. Pass scheduled_time if specified (e.g. "week of March 16 2026").
-4. schedule_meeting: Schedule meeting. Pass scheduled_time: exact datetime, or "week of March 16 2026" for flexible scheduling.
-5. create_todo: Create TODO. Set created_by_agent=true.
-6. get_calendar_free_slots: Get slots for one date (YYYY-MM-DD, today, tomorrow).
-7. get_calendar_free_slots_in_range: Get slots across dates. Use for "week of X" or date ranges.
+2. record_interaction: Call IMMEDIATELY after upsert_contact. You MUST use the exact "id" from the upsert_contact result as contact_id. If you call both in one turn, the system will auto-fill contact_id for record_interaction.
 
-Always upsert_contact and record_interaction. Then schedule follow_up/meeting/todo as appropriate.
+Always call upsert_contact first, then record_interaction with the contact_id from the result.
 """
 
 TOOLS = [
@@ -74,85 +59,22 @@ TOOLS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "schedule_follow_up",
-            "description": "Schedule follow-up on calendar. Default 2 days if no time specified.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "contact_name": {"type": "string"},
-                    "summary": {"type": "string"},
-                    "scheduled_time": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "schedule_meeting",
-            "description": "Schedule meeting. Pass scheduled_time: '2026-03-18 18:00', 'tomorrow 6pm', or 'week of March 16 2026' for flexible week scheduling. Tool finds first free slot to avoid conflicts.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "contact_name": {"type": "string"},
-                    "summary": {"type": "string"},
-                    "scheduled_time": {"type": "string"},
-                    "duration_minutes": {"type": "integer"},
-                    "description": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_todo",
-            "description": "Create TODO from action item",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "description": {"type": "string"},
-                    "contact_id": {"type": "string"},
-                },
-                "required": ["title"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_calendar_free_slots",
-            "description": "Get available slots for one date (5PM-10PM Pacific). date: YYYY-MM-DD, today, or tomorrow.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string"},
-                    "duration_minutes": {"type": "integer"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_calendar_free_slots_in_range",
-            "description": "Get slots across a date range. Use when user says 'week of March 16' or 'sometime in the week of X'. start_date and end_date: YYYY-MM-DD or 'March 16 2026'.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string"},
-                    "end_date": {"type": "string"},
-                    "duration_minutes": {"type": "integer"},
-                },
-                "required": ["start_date", "end_date"],
-            },
-        },
-    },
 ]
+
+
+def _parse_uuid(value) -> str | None:
+    """Return hex string if valid UUID, else None."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        from uuid import UUID
+        UUID(s)
+        return s
+    except (ValueError, TypeError):
+        return None
 
 
 class OrchestratorAgent:
@@ -214,6 +136,8 @@ class OrchestratorAgent:
             for tc in choice.message.tool_calls:
                 name = tc.function.name
                 args = json.loads(tc.function.arguments or "{}")
+                if name == "record_interaction" and contact_id and not _parse_uuid(args.get("contact_id")):
+                    args["contact_id"] = str(contact_id)
                 logger.info("Tool call: %s %s", name, args)
                 try:
                     result = await self.tool_executor.execute(name, args)

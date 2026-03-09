@@ -234,8 +234,8 @@ async def list_contacts(
 
     r = await session.execute(
         text(
-            f"SELECT c.id, c.full_name, c.email, c.phone, c.country, c.last_contacted_at, "
-            f"c.last_interaction_summary, co.name as company_name FROM contacts c "
+            f"SELECT c.id, c.full_name, c.country, c.last_contacted_at, "
+            f"c.last_interaction_summary, c.next_follow_up_at, co.name as company_name FROM contacts c "
             f"LEFT JOIN companies co ON c.company_id = co.id WHERE {where} "
             f"ORDER BY {order} LIMIT :limit OFFSET :offset"
         ),
@@ -339,6 +339,22 @@ async def update_contact_fields(
     )
     logger.info("Updated contact fields for %s", contact_id)
     return await get_contact(session, contact_id)
+
+
+async def set_next_follow_up(
+    session: AsyncSession,
+    contact_id: UUID,
+    next_follow_up_at,
+) -> None:
+    """Set contact's next_follow_up_at (datetime or None)."""
+    from sqlalchemy import text
+
+    await session.execute(
+        text(
+            "UPDATE contacts SET next_follow_up_at = :at, updated_at = :now WHERE id = :id"
+        ),
+        {"id": contact_id, "at": next_follow_up_at, "now": datetime.utcnow()},
+    )
 
 
 async def get_stale_contacts(

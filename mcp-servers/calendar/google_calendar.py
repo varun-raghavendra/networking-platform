@@ -9,7 +9,7 @@ import pytz
 
 logger = logging.getLogger(__name__)
 
-PACIFIC = pytz.timezone("America/Los_Angeles")
+MOUNTAIN = pytz.timezone("America/Denver")
 
 
 def get_calendar_service():
@@ -70,14 +70,14 @@ def get_free_slots(
     end_hour: int = 22,
     duration_minutes: int = 10,
 ) -> list[dict]:
-    """Get free slots between start_hour and end_hour Pacific Time."""
+    """Get free slots between start_hour and end_hour Mountain Time."""
     if date is None:
-        date = datetime.now(PACIFIC).date()
+        date = datetime.now(MOUNTAIN).date()
 
-    day_start = PACIFIC.localize(
+    day_start = MOUNTAIN.localize(
         datetime(date.year, date.month, date.day, start_hour, 0, 0)
     )
-    day_end = PACIFIC.localize(datetime(date.year, date.month, date.day, end_hour, 0, 0))
+    day_end = MOUNTAIN.localize(datetime(date.year, date.month, date.day, end_hour, 0, 0))
 
     def _fetch():
         return (
@@ -118,7 +118,7 @@ def get_free_slots(
             slots.append({
                 "start": current.isoformat(),
                 "end": slot_end.isoformat(),
-                "start_pacific": current.astimezone(PACIFIC).strftime("%Y-%m-%d %H:%M %Z"),
+                "start_mountain": current.astimezone(MOUNTAIN).strftime("%Y-%m-%d %H:%M %Z"),
             })
         current += slot_duration
 
@@ -136,7 +136,7 @@ def get_free_slots_in_range(
     max_slots: int = 20,
 ) -> list[dict]:
     """Get free slots across a date range (e.g. week of March 16)."""
-    now = datetime.now(PACIFIC).date()
+    now = datetime.now(MOUNTAIN).date()
     if start_date is None:
         start_date = now
     if end_date is None:
@@ -171,9 +171,9 @@ def schedule_event(
     description: str = "",
     calendar_id: str = "primary",
 ) -> dict:
-    """Schedule an event. start_time should be timezone-aware (Pacific)."""
+    """Schedule an event. start_time should be timezone-aware (Mountain)."""
     if start_time.tzinfo is None:
-        start_time = PACIFIC.localize(start_time)
+        start_time = MOUNTAIN.localize(start_time)
     end_time = start_time + timedelta(minutes=duration_minutes)
 
     event = {
@@ -181,11 +181,11 @@ def schedule_event(
         "description": description or "",
         "start": {
             "dateTime": start_time.isoformat(),
-            "timeZone": "America/Los_Angeles",
+            "timeZone": "America/Denver",
         },
         "end": {
             "dateTime": end_time.isoformat(),
-            "timeZone": "America/Los_Angeles",
+            "timeZone": "America/Denver",
         },
     }
 

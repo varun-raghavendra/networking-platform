@@ -8,9 +8,14 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import re
+
 from config import get_settings, setup_logging
 from database import get_session, run_migrations
 from orchestrator.agent import OrchestratorAgent
+from orchestrator.followup_agent import FollowupAgent
+from orchestrator.meeting_agent import MeetingAgent
+from orchestrator.todo_agent import TodoAgent
 from orchestrator.tool_executor import ToolExecutor
 from services import audit, contacts, export_service, todos
 
@@ -114,17 +119,89 @@ async def process_prompt(input: PromptInput):
         phone=phone,
         country=country,
         last_contacted=input.last_contacted,
-        follow_up_time=input.follow_up_time,
+        follow_up_time=None,
         meeting_time=input.meeting_time,
         meeting_context=input.meeting_context,
     )
-    if result.get("status") == "completed" and result.get("contact_id") and input.last_contacted:
-        parsed = contacts._parse_datetime_safe(input.last_contacted)
-        if parsed:
-            async with get_session() as session:
-                await contacts.update_contact_fields(
-                    session, UUID(result["contact_id"]), last_contacted_at=input.last_contacted
+    contact_id = result.get("contact_id")
+    if result.get("status") == "completed" and contact_id:
+        if input.last_contacted:
+            parsed = contacts._parse_datetime_safe(input.last_contacted)
+            if parsed:
+                async with get_session() as session:
+                    await contacts.update_contact_fields(
+                        session, UUID(contact_id), last_contacted_at=input.last_contacted
+                    )
+        if input.meeting_time or input.meeting_context:
+            meeting_agent = MeetingAgent()
+            meeting_scheduled_time = await meeting_agent.get_meeting_time(
+                contact_name=contact_name,
+                interaction_summary=input.interaction_summary,
+                meeting_time=input.meeting_time,
+                meeting_context=input.meeting_context,
+                last_contacted=input.last_contacted,
+            )
+            if meeting_scheduled_time:
+                try:
+                    meeting_result = await executor._call_calendar_mcp(
+                        "schedule_meeting",
+                        {
+                            "contact_name": contact_name,
+                            "summary": input.interaction_summary,
+                            "scheduled_time": meeting_scheduled_time,
+                        },
+                    )
+                    result.setdefault("actions", []).append({
+                        "type": "schedule_meeting",
+                        "success": "Error" not in meeting_result,
+                        "details": {"result": meeting_result},
+                    })
+                except Exception as e:
+                    logger.exception("schedule_meeting failed: %s", e)
+                    result.setdefault("actions", []).append({"type": "schedule_meeting", "success": False, "details": {"error": str(e)}})
+        todo_agent = TodoAgent()
+        todo_items = await todo_agent.extract_todos(input.interaction_summary)
+        for item in todo_items:
+            try:
+                tr = await executor._create_todo({
+                    "title": item["title"],
+                    "description": item.get("description"),
+                    "contact_id": contact_id,
+                })
+                result.setdefault("actions", []).append({"type": "create_todo", "success": "Error" not in str(tr), "details": {"result": tr}})
+            except Exception as e:
+                logger.exception("create_todo failed: %s", e)
+                result.setdefault("actions", []).append({"type": "create_todo", "success": False, "details": {"error": str(e)}})
+        followup_agent = FollowupAgent()
+        scheduled_time = await followup_agent.get_followup_time(
+            contact_name=contact_name,
+            interaction_summary=input.interaction_summary,
+            follow_up_time=input.follow_up_time,
+            meeting_time=input.meeting_time,
+            meeting_context=input.meeting_context,
+            last_contacted=input.last_contacted,
+        )
+        if scheduled_time:
+            try:
+                followup_result = await executor._call_calendar_mcp(
+                    "schedule_follow_up",
+                    {"contact_name": contact_name, "summary": input.interaction_summary, "scheduled_time": scheduled_time},
                 )
+                result.setdefault("actions", []).append({"type": "schedule_follow_up", "success": "Error" not in followup_result, "details": {"result": followup_result}})
+                m = re.search(r"(\d{4}-\d{2}-\d{2})[T\s]+(\d{2}:\d{2})", followup_result)
+                if m:
+                    from datetime import datetime
+                    from zoneinfo import ZoneInfo
+                    dt_str = f"{m.group(1)}T{m.group(2)}:00"
+                    try:
+                        dt = datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=ZoneInfo("America/Denver"))
+                        async with get_session() as session:
+                            await contacts.set_next_follow_up(session, UUID(contact_id), dt)
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.exception("schedule_follow_up failed: %s", e)
+                result.setdefault("actions", []).append({"type": "schedule_follow_up", "success": False, "details": {"error": str(e)}})
     return {"id": "prompt-1", **result}
 
 

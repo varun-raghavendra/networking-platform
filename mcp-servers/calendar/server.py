@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP("Calendar")
 
-PACIFIC = pytz.timezone("America/Los_Angeles")
+MOUNTAIN = pytz.timezone("America/Denver")
 START_HOUR = int(os.environ.get("SCHEDULE_START_HOUR", "17"))
 END_HOUR = int(os.environ.get("SCHEDULE_END_HOUR", "22"))
 DEFAULT_DURATION = int(os.environ.get("DEFAULT_MEETING_DURATION_MINUTES", "10"))
@@ -51,7 +51,7 @@ def _parse_date(s: str) -> Optional[date]:
             try:
                 month = months.split().index(p) + 1
                 day = int(parts[i + 1])
-                year = int(parts[i + 2]) if i + 2 < len(parts) and parts[i + 2].isdigit() else datetime.now(PACIFIC).year
+                year = int(parts[i + 2]) if i + 2 < len(parts) and parts[i + 2].isdigit() else datetime.now(MOUNTAIN).year
                 return date(year, month, day)
             except (ValueError, IndexError):
                 pass
@@ -73,11 +73,11 @@ def _parse_week_range(s: str) -> Optional[tuple[date, date]]:
 
 
 def _parse_datetime(s: str) -> Optional[datetime]:
-    """Parse natural date string to datetime in Pacific."""
+    """Parse natural date string to datetime in Mountain Time."""
     if not s or not s.strip():
         return None
     s0 = s.strip().lower()
-    now = datetime.now(PACIFIC)
+    now = datetime.now(MOUNTAIN)
     base = None
     if "tomorrow" in s0:
         base = (now + timedelta(days=1)).date()
@@ -96,20 +96,20 @@ def _parse_datetime(s: str) -> Optional[datetime]:
         if str(h) in s0 or f"{h}:" in s0 or f"{h}pm" in s0 or f"{h} pm" in s0:
             hour = h
             break
-    result = PACIFIC.localize(datetime(base.year, base.month, base.day, hour, minute, 0))
+    result = MOUNTAIN.localize(datetime(base.year, base.month, base.day, hour, minute, 0))
     return result
 
 
 def _resolve_date(d: Optional[str]):
     """Resolve date string to date object."""
     if not d:
-        return datetime.now(PACIFIC).date()
+        return datetime.now(MOUNTAIN).date()
     d0 = d.strip().lower()
     if d0 == "tomorrow":
-        return (datetime.now(PACIFIC) + timedelta(days=1)).date()
+        return (datetime.now(MOUNTAIN) + timedelta(days=1)).date()
     if d0 == "today":
-        return datetime.now(PACIFIC).date()
-    return _parse_date(d) or datetime.now(PACIFIC).date()
+        return datetime.now(MOUNTAIN).date()
+    return _parse_date(d) or datetime.now(MOUNTAIN).date()
 
 
 @mcp.tool()
@@ -119,7 +119,7 @@ def get_calendar_free_slots(
 ) -> str:
     """
     Get available time slots in the calendar for the given date.
-    Only returns slots between 5PM and 10PM Pacific Time.
+    Only returns slots between 5PM and 10PM Mountain Time.
     date: Optional date string (YYYY-MM-DD), 'today', or 'tomorrow'. Default: today.
     duration_minutes: Length of slot needed (default 10).
     """
@@ -136,7 +136,7 @@ def get_calendar_free_slots(
             duration_minutes=duration_minutes,
         )
         if not slots:
-            return "No free slots available between 5PM and 10PM Pacific."
+            return "No free slots available between 5PM and 10PM Mountain."
         return str(slots)
     except Exception as e:
         logger.exception("get_calendar_free_slots failed: %s", e)
@@ -159,7 +159,7 @@ def get_calendar_free_slots_in_range(
     logger.info("get_calendar_free_slots_in_range %s to %s", start_date, end_date)
     try:
         service = get_calendar_service()
-        start = _parse_date(start_date) or datetime.now(PACIFIC).date()
+        start = _parse_date(start_date) or datetime.now(MOUNTAIN).date()
         end = _parse_date(end_date) or start + timedelta(days=6)
         if end < start:
             end = start + timedelta(days=6)
@@ -174,7 +174,7 @@ def get_calendar_free_slots_in_range(
             max_slots=20,
         )
         if not slots:
-            return f"No free slots between {start} and {end} (5PM-10PM Pacific)."
+            return f"No free slots between {start} and {end} (5PM-10PM Mountain)."
         return str(slots)
     except Exception as e:
         logger.exception("get_calendar_free_slots_in_range failed: %s", e)
@@ -187,7 +187,7 @@ def _find_available_slot(
     duration_minutes: int,
 ) -> Optional[datetime]:
     """Return a free slot: preferred time if it falls in a free slot, else first free that day."""
-    day = (preferred_time or datetime.now(PACIFIC)).date()
+    day = (preferred_time or datetime.now(MOUNTAIN)).date()
     slots = get_free_slots(
         service, "primary", date=day,
         start_hour=START_HOUR, end_hour=END_HOUR,
@@ -216,7 +216,7 @@ def schedule_meeting(
 ) -> str:
     """
     Schedule a meeting on Google Calendar.
-    If scheduled_time not provided, uses first available slot 5PM-10PM Pacific.
+    If scheduled_time not provided, uses first available slot 5PM-10PM Mountain.
     scheduled_time: '2026-03-18 18:00', 'tomorrow 6pm', or 'week of March 16 2026'.
     For 'week of X', finds first available slot in that week to avoid conflicts.
     """
@@ -248,7 +248,7 @@ def schedule_meeting(
                 duration_minutes=duration_minutes,
             )
             if not slots:
-                return "Error: No free slots between 5PM-10PM Pacific."
+                return "Error: No free slots between 5PM-10PM Mountain."
             start_dt = datetime.fromisoformat(slots[0]["start"])
 
         event = schedule_event(
@@ -272,13 +272,13 @@ def schedule_follow_up(
 ) -> str:
     """
     Schedule a follow-up on Google Calendar.
-    If no time specified, defaults to 2 days from now. Uses 5PM-10PM Pacific window.
+    If no time specified, defaults to 2 days from now. Uses 5PM-10PM Mountain window.
     scheduled_time: e.g. '2026-03-18 6pm', 'week of March 16 2026'. Uses first available slot.
     """
     logger.info("schedule_follow_up contact=%s time=%s", contact_name, scheduled_time)
     try:
         service = get_calendar_service()
-        now = datetime.now(PACIFIC)
+        now = datetime.now(MOUNTAIN)
         start_dt = None
         if scheduled_time:
             week_range = _parse_week_range(scheduled_time)
@@ -308,11 +308,11 @@ def schedule_follow_up(
             if slots:
                 start_dt = datetime.fromisoformat(slots[0]["start"])
             else:
-                start_dt = PACIFIC.localize(
+                start_dt = MOUNTAIN.localize(
                     datetime(default_day.year, default_day.month, default_day.day, 18, 0, 0)
                 )
         if start_dt.tzinfo is None:
-            start_dt = PACIFIC.localize(start_dt)
+            start_dt = MOUNTAIN.localize(start_dt)
 
         event = schedule_event(
             service,

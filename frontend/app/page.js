@@ -47,8 +47,6 @@ function toDatetimeLocal(iso) {
 function ContactRow({ contact, getWarmthStyle, onSaved }) {
   const [editing, setEditing] = useState(false)
   const [country, setCountry] = useState(contact.country || '')
-  const [phone, setPhone] = useState(contact.phone || '')
-  const [email, setEmail] = useState(contact.email || '')
   const [lastContacted, setLastContacted] = useState(toDatetimeLocal(contact.last_contacted_at))
   const [saving, setSaving] = useState(false)
 
@@ -62,8 +60,6 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             country: country || null,
-            phone: phone || null,
-            email: email || null,
             last_contacted_at: lastContacted ? new Date(lastContacted).toISOString() : null,
           }),
         }
@@ -81,49 +77,28 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
 
   const cancel = () => {
     setCountry(contact.country || '')
-    setPhone(contact.phone || '')
-    setEmail(contact.email || '')
     setLastContacted(toDatetimeLocal(contact.last_contacted_at))
     setEditing(false)
   }
+
+  const followUpHours = contact.next_follow_up_at
+    ? Math.round((new Date(contact.next_follow_up_at) - Date.now()) / (1000 * 60 * 60))
+    : null
 
   return (
     <tr style={getWarmthStyle(contact.last_contacted_at)}>
       <td>{contact.full_name}</td>
       {editing ? (
-        <>
-          <td>
-            <input
-              className={styles.inlineInput}
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              placeholder="Country"
-            />
-          </td>
-          <td>
-            <input
-              className={styles.inlineInput}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone"
-            />
-          </td>
-          <td>
-            <input
-              className={styles.inlineInput}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-            />
-          </td>
-        </>
+        <td>
+          <input
+            className={styles.inlineInput}
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            placeholder="Country"
+          />
+        </td>
       ) : (
-        <>
-          <td>{contact.country || '-'}</td>
-          <td>{contact.phone || '-'}</td>
-          <td>{contact.email || '-'}</td>
-        </>
+        <td>{contact.country || '-'}</td>
       )}
       <td>
         {editing ? (
@@ -138,6 +113,7 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
           (contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleString() : '-')
         )}
       </td>
+      <td>{followUpHours != null ? `${followUpHours}h` : '-'}</td>
       <td>{contact.last_interaction_summary || '-'}</td>
       <td>
         {editing ? (
@@ -146,7 +122,7 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
             <button onClick={cancel} disabled={saving} className={styles.btnSmall}>Cancel</button>
           </span>
         ) : (
-          <button onClick={() => setEditing(true)} className={styles.btnSmall} title="Edit country, phone, email, last contacted">Edit</button>
+          <button onClick={() => setEditing(true)} className={styles.btnSmall} title="Edit country, last contacted">Edit</button>
         )}
       </td>
     </tr>
@@ -227,9 +203,8 @@ function WarmContactsTab() {
           <tr>
             <th>Contact</th>
             <th>Country</th>
-            <th>Phone</th>
-            <th>Email</th>
             <th>Last Contacted</th>
+            <th>Follow up (hrs)</th>
             <th>Summary</th>
             <th></th>
           </tr>
