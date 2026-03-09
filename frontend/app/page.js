@@ -44,7 +44,7 @@ function toDatetimeLocal(iso) {
   return `${y}-${m}-${day}T${h}:${min}`
 }
 
-function ContactRow({ contact, getWarmthStyle, onSaved }) {
+function ContactRow({ contact, getWarmthStyle, onSaved, onRemove }) {
   const [editing, setEditing] = useState(false)
   const [country, setCountry] = useState(contact.country || '')
   const [lastContacted, setLastContacted] = useState(toDatetimeLocal(contact.last_contacted_at))
@@ -125,7 +125,10 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
             <button onClick={cancel} disabled={saving} className={styles.btnSmall}>Cancel</button>
           </span>
         ) : (
-          <button onClick={() => setEditing(true)} className={styles.btnSmall} title="Edit country, last contacted">Edit</button>
+          <span className={styles.editActions}>
+            <button onClick={() => setEditing(true)} className={styles.btnSmall} title="Edit country, last contacted">Edit</button>
+            {onRemove && <button onClick={() => onRemove(contact)} className={styles.btnDanger} title="Remove contact">Remove</button>}
+          </span>
         )}
       </td>
     </tr>
@@ -139,6 +142,7 @@ function WarmContactsTab() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('last_contacted_desc')
   const [total, setTotal] = useState(0)
+  const [contactToRemove, setContactToRemove] = useState(null)
 
   const fetchContacts = async () => {
     setLoading(true)
@@ -177,6 +181,22 @@ function WarmContactsTab() {
   }
 
   const MAX_DAYS = 14
+  const removeContact = async () => {
+    if (!contactToRemove) return
+    try {
+      const res = await fetch(
+        (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + `/api/contacts/${contactToRemove.id}`,
+        { method: 'DELETE' }
+      )
+      if (res.ok) {
+        setContactToRemove(null)
+        fetchContacts()
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const getWarmthStyle = (lastContacted) => {
     let days = MAX_DAYS
     if (lastContacted) {
@@ -228,12 +248,25 @@ function WarmContactsTab() {
               contact={c}
               getWarmthStyle={getWarmthStyle}
               onSaved={fetchContacts}
+              onRemove={setContactToRemove}
             />
           ))}
         </tbody>
       </table>
       {!loading && contacts.length === 0 && (
         <p className={styles.empty}>No contacts yet. Add one via the Input Prompt tab.</p>
+      )}
+      {contactToRemove && (
+        <div className={styles.modalOverlay} onClick={() => setContactToRemove(null)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Remove contact</h3>
+            <p>Are you sure you want to remove <strong>{contactToRemove.full_name}</strong>? This will delete their interaction history.</p>
+            <div className={styles.modalActions}>
+              <button onClick={() => setContactToRemove(null)} className={styles.btnSecondary}>Cancel</button>
+              <button onClick={removeContact} className={styles.btnDanger}>Remove</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

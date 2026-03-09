@@ -275,6 +275,16 @@ async def get_contact(session: AsyncSession, contact_id: UUID) -> Optional[dict]
     return dict(row._mapping) if row else None
 
 
+async def delete_contact(session: AsyncSession, contact_id: UUID) -> bool:
+    """Delete contact. Returns True if deleted, False if not found."""
+    from sqlalchemy import text
+    r = await session.execute(text("DELETE FROM contacts WHERE id = :id RETURNING id"), {"id": contact_id})
+    if r.fetchone():
+        logger.info("Deleted contact %s", contact_id)
+        return True
+    return False
+
+
 async def get_contact_interactions(
     session: AsyncSession, contact_id: UUID, limit: int = 20
 ) -> list[dict]:

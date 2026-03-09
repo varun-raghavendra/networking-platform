@@ -238,6 +238,16 @@ async def get_contact(contact_id: UUID):
         return c
 
 
+@app.delete("/api/contacts/{contact_id}")
+async def delete_contact(contact_id: UUID):
+    """Delete a contact."""
+    async with get_session() as session:
+        ok = await contacts.delete_contact(session, contact_id)
+        if not ok:
+            raise HTTPException(404, "Contact not found")
+        return {"success": True}
+
+
 @app.patch("/api/contacts/{contact_id}")
 async def update_contact(contact_id: UUID, input: ContactUpdateInput):
     """Update contact country, phone, email, last_contacted_at."""

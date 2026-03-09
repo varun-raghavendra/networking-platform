@@ -15,9 +15,11 @@ Return a JSON array of objects. Each object has:
 - title: Short actionable title (required)
 - description: Optional longer description
 - priority: "high", "medium", or "low" (required). Use these rules:
-  * high: User said high priority; apply to jobs they suggested; follow-up on application; user asked to apply
+  * high: User said high priority; apply to jobs they suggested; follow-up on application; user asked to apply; referrals
   * medium: Find jobs at their company; most other actionable items; use judgment
   * low: Check back with them after some time; simple catch-ups; informal follow-ups
+
+Important: When the interaction involves referrals (user asked for a referral, contact offered to refer them, or similar), always include a TODO "Follow up on referral" with priority "high".
 
 If there are no clear action items, return an empty array [].
 
@@ -33,6 +35,9 @@ Output: [{"title": "Catch up with contact", "priority": "low"}]
 
 Input: "Follow up on my application to the PM role"
 Output: [{"title": "Follow up on PM role application", "priority": "high"}]
+
+Input: "I asked for a referral to their team and they said they'd pass my resume along"
+Output: [{"title": "Follow up on referral", "priority": "high"}]
 
 Return ONLY valid JSON, no other text."""
 
