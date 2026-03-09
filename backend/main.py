@@ -64,6 +64,7 @@ class ContactUpdateInput(BaseModel):
     country: str | None = None
     phone: str | None = None
     email: str | None = None
+    last_contacted_at: str | None = None  # ISO datetime, e.g. 2026-03-01 or 2026-03-01T18:00:00
 
 
 class InteractionInput(BaseModel):
@@ -117,6 +118,13 @@ async def process_prompt(input: PromptInput):
         meeting_time=input.meeting_time,
         meeting_context=input.meeting_context,
     )
+    if result.get("status") == "completed" and result.get("contact_id") and input.last_contacted:
+        parsed = contacts._parse_datetime_safe(input.last_contacted)
+        if parsed:
+            async with get_session() as session:
+                await contacts.update_contact_fields(
+                    session, UUID(result["contact_id"]), last_contacted_at=input.last_contacted
+                )
     return {"id": "prompt-1", **result}
 
 
@@ -145,13 +153,14 @@ async def get_contact(contact_id: UUID):
 
 @app.patch("/api/contacts/{contact_id}")
 async def update_contact(contact_id: UUID, input: ContactUpdateInput):
-    """Update contact country, phone, email only. last_contacted must go through prompt."""
+    """Update contact country, phone, email, last_contacted_at."""
     async with get_session() as session:
         result = await contacts.update_contact_fields(
             session, contact_id,
             country=input.country,
             phone=input.phone,
             email=input.email,
+            last_contacted_at=input.last_contacted_at,
         )
         if not result:
             raise HTTPException(404, "Contact not found")

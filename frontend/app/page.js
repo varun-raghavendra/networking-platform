@@ -33,11 +33,23 @@ export default function Home() {
   )
 }
 
-function ContactRow({ contact, getWarmthClass, onSaved }) {
+function toDatetimeLocal(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
+}
+
+function ContactRow({ contact, getWarmthStyle, onSaved }) {
   const [editing, setEditing] = useState(false)
   const [country, setCountry] = useState(contact.country || '')
   const [phone, setPhone] = useState(contact.phone || '')
   const [email, setEmail] = useState(contact.email || '')
+  const [lastContacted, setLastContacted] = useState(toDatetimeLocal(contact.last_contacted_at))
   const [saving, setSaving] = useState(false)
 
   const save = async () => {
@@ -48,7 +60,12 @@ function ContactRow({ contact, getWarmthClass, onSaved }) {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ country: country || null, phone: phone || null, email: email || null }),
+          body: JSON.stringify({
+            country: country || null,
+            phone: phone || null,
+            email: email || null,
+            last_contacted_at: lastContacted ? new Date(lastContacted).toISOString() : null,
+          }),
         }
       )
       if (res.ok) {
@@ -66,11 +83,12 @@ function ContactRow({ contact, getWarmthClass, onSaved }) {
     setCountry(contact.country || '')
     setPhone(contact.phone || '')
     setEmail(contact.email || '')
+    setLastContacted(toDatetimeLocal(contact.last_contacted_at))
     setEditing(false)
   }
 
   return (
-    <tr className={getWarmthClass(contact.last_contacted_at)}>
+    <tr style={getWarmthStyle(contact.last_contacted_at)}>
       <td>{contact.full_name}</td>
       {editing ? (
         <>
@@ -107,7 +125,19 @@ function ContactRow({ contact, getWarmthClass, onSaved }) {
           <td>{contact.email || '-'}</td>
         </>
       )}
-      <td>{contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleString() : '-'}</td>
+      <td>
+        {editing ? (
+          <input
+            className={styles.inlineInput}
+            type="datetime-local"
+            value={lastContacted}
+            onChange={(e) => setLastContacted(e.target.value)}
+            title="Last contacted"
+          />
+        ) : (
+          (contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleString() : '-')
+        )}
+      </td>
       <td>{contact.last_interaction_summary || '-'}</td>
       <td>
         {editing ? (
@@ -116,7 +146,7 @@ function ContactRow({ contact, getWarmthClass, onSaved }) {
             <button onClick={cancel} disabled={saving} className={styles.btnSmall}>Cancel</button>
           </span>
         ) : (
-          <button onClick={() => setEditing(true)} className={styles.btnSmall} title="Edit country, phone, email">Edit</button>
+          <button onClick={() => setEditing(true)} className={styles.btnSmall} title="Edit country, phone, email, last contacted">Edit</button>
         )}
       </td>
     </tr>
@@ -165,14 +195,16 @@ function WarmContactsTab() {
     window.open((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/export/contacts', '_blank')
   }
 
-  const getWarmthClass = (lastContacted) => {
-    if (!lastContacted) return styles.cold
-    const d = new Date(lastContacted)
-    const days = (Date.now() - d) / (24 * 60 * 60 * 1000)
-    if (days <= 7) return styles.hot
-    if (days <= 30) return styles.warm
-    if (days <= 90) return styles.cool
-    return styles.cold
+  const MAX_DAYS = 14
+  const getWarmthStyle = (lastContacted) => {
+    let days = MAX_DAYS
+    if (lastContacted) {
+      const d = new Date(lastContacted)
+      days = Math.min(MAX_DAYS, (Date.now() - d) / (24 * 60 * 60 * 1000))
+    }
+    const recency = 1 - days / MAX_DAYS
+    const hue = Math.round(120 * recency)
+    return { borderLeft: `4px solid hsl(${hue}, 85%, 48%)` }
   }
 
   return (
@@ -207,7 +239,7 @@ function WarmContactsTab() {
             <ContactRow
               key={c.id}
               contact={c}
-              getWarmthClass={getWarmthClass}
+              getWarmthStyle={getWarmthStyle}
               onSaved={fetchContacts}
             />
           ))}
@@ -307,6 +339,7 @@ function InputPromptTab() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [country, setCountry] = useState('United States')
+  const [lastContacted, setLastContacted] = useState('')
   const [followUp, setFollowUp] = useState('')
   const [meetingTime, setMeetingTime] = useState('')
   const [meetingContext, setMeetingContext] = useState('')
@@ -350,9 +383,16 @@ function InputPromptTab() {
     setLoading(true)
     setResult(null)
     try {
+      const baseBody = {
+        interaction_summary: summary,
+        last_contacted: lastContacted || null,
+        follow_up_time: followUp || null,
+        meeting_time: meetingTime || null,
+        meeting_context: meetingContext || null,
+      }
       const body = flow === 'existing'
-        ? { contact_id: selectedContactId, interaction_summary: summary, follow_up_time: followUp || null, meeting_time: meetingTime || null, meeting_context: meetingContext || null }
-        : { contact_name: contactName, company, interaction_summary: summary, email: email || null, phone: phone || null, country: country || 'United States', follow_up_time: followUp || null, meeting_time: meetingTime || null, meeting_context: meetingContext || null }
+        ? { contact_id: selectedContactId, ...baseBody }
+        : { contact_name: contactName, company, email: email || null, phone: phone || null, country: country || 'United States', ...baseBody }
       const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -413,6 +453,8 @@ function InputPromptTab() {
 
         <label>Interaction summary *</label>
         <textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={4} className={styles.input} placeholder="Summary of the conversation" />
+        <label>Last contacted (optional)</label>
+        <input type="datetime-local" value={lastContacted} onChange={(e) => setLastContacted(e.target.value)} className={styles.input} title="When you last spoke (defaults to now if left blank)" />
         <label>Follow-up time (optional)</label>
         <input placeholder="e.g. in 2 days, next Tuesday 3pm" value={followUp} onChange={(e) => setFollowUp(e.target.value)} className={styles.input} />
         <label>Meeting time (optional)</label>

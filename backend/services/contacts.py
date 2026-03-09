@@ -41,13 +41,14 @@ async def find_duplicate_contact(
     email: Optional[str] = None,
     phone: Optional[str] = None,
     full_name: Optional[str] = None,
+    company_id: Optional[str] = None,
 ) -> Optional[dict]:
-    """Find existing contact by email or phone for deduplication."""
+    """Find existing contact by email, phone, or full_name+company for deduplication."""
     from sqlalchemy import text
 
-    if email:
+    if email and email.strip():
         r = await session.execute(
-            text("SELECT * FROM contacts WHERE LOWER(email) = LOWER(:email) LIMIT 1"),
+            text("SELECT * FROM contacts WHERE LOWER(TRIM(email)) = LOWER(TRIM(:email)) LIMIT 1"),
             {"email": email},
         )
         row = r.fetchone()
@@ -55,9 +56,30 @@ async def find_duplicate_contact(
             return dict(row._mapping)
     if phone and phone.strip():
         r = await session.execute(
-            text("SELECT * FROM contacts WHERE phone = :phone LIMIT 1"),
+            text("SELECT * FROM contacts WHERE TRIM(phone) = TRIM(:phone) LIMIT 1"),
             {"phone": phone},
         )
+        row = r.fetchone()
+        if row:
+            return dict(row._mapping)
+    if full_name and full_name.strip():
+        name_norm = full_name.strip()
+        if company_id:
+            r = await session.execute(
+                text(
+                    "SELECT * FROM contacts WHERE LOWER(TRIM(full_name)) = LOWER(:name) "
+                    "AND company_id = :cid LIMIT 1"
+                ),
+                {"name": name_norm, "cid": company_id},
+            )
+        else:
+            r = await session.execute(
+                text(
+                    "SELECT * FROM contacts WHERE LOWER(TRIM(full_name)) = LOWER(:name) "
+                    "AND company_id IS NULL LIMIT 1"
+                ),
+                {"name": name_norm},
+            )
         row = r.fetchone()
         if row:
             return dict(row._mapping)
@@ -75,14 +97,11 @@ async def upsert_contact(
     tags: Optional[list[str]] = None,
     interaction_summary: Optional[str] = None,
 ) -> dict:
-    """Create or update contact. Deduplicates by email/phone."""
+    """Create or update contact. Deduplicates by email, phone, or full_name+company."""
     from sqlalchemy import text
     from uuid import uuid4
 
     now = datetime.utcnow()
-
-    # Find existing
-    existing = await find_duplicate_contact(session, email=email, phone=phone)
     company_id = None
     if company_name:
         r = await session.execute(
@@ -104,6 +123,9 @@ async def upsert_contact(
             if row:
                 company_id = str(row[0])
 
+    existing = await find_duplicate_contact(
+        session, email=email, phone=phone, full_name=full_name, company_id=company_id
+    )
     if existing:
         contact_id = existing["id"]
         # Update
@@ -264,14 +286,32 @@ async def get_contact_interactions(
     return [dict(row._mapping) for row in r.fetchall()]
 
 
+def _parse_datetime_safe(s: Optional[str]):
+    """Parse ISO or YYYY-MM-DD string to datetime. Returns None on failure."""
+    if not s or not s.strip():
+        return None
+    from datetime import datetime as dt
+    s = s.strip()
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return dt.strptime(s[:26], fmt)
+        except (ValueError, TypeError):
+            continue
+    try:
+        return dt.fromisoformat(s.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
 async def update_contact_fields(
     session: AsyncSession,
     contact_id: UUID,
     country: Optional[str] = None,
     phone: Optional[str] = None,
     email: Optional[str] = None,
+    last_contacted_at: Optional[str] = None,
 ) -> Optional[dict]:
-    """Update only country, phone, email. last_contacted must go through prompt."""
+    """Update contact fields including last_contacted_at."""
     from sqlalchemy import text
 
     updates = ["updated_at = :now"]
@@ -285,6 +325,11 @@ async def update_contact_fields(
     if email is not None:
         updates.append("email = :email")
         params["email"] = email or None
+    if last_contacted_at is not None:
+        parsed = _parse_datetime_safe(last_contacted_at)
+        if parsed:
+            updates.append("last_contacted_at = :last_contacted_at")
+            params["last_contacted_at"] = parsed
 
     if len(updates) == 1:
         return await get_contact(session, contact_id)

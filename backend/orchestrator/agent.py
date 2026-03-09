@@ -21,20 +21,22 @@ Input format:
 - company: Company the contact belongs to
 - Optional: email, phone, country, last_contacted, follow_up_time, meeting_time, meeting_context
 
-You have these tools. Use them as needed:
+Scheduling rules (IMPORTANT - prevents conflicts):
+- When meeting_time says "sometime in the week of March 16" or "week of March 16, 2026": pass that EXACT phrase to schedule_meeting (e.g. scheduled_time="week of March 16 2026"). The calendar will find the first available slot in that week.
+- When meeting_time is vague (e.g. "next week", "sometime in March"): call get_calendar_free_slots_in_range with start_date and end_date for that range, then pass the first slot to schedule_meeting.
+- NEVER guess a specific time like "6pm" for multiple meetings - that causes overlapping events. Each schedule_meeting/schedule_follow_up finds a free slot; if scheduling both a meeting and follow-up, the tools handle different slots.
+- For explicit times (e.g. "tomorrow 6pm"), pass them to schedule_meeting; the tool checks availability and picks a free slot if busy.
 
-1. upsert_contact: Always call first to create/update the contact. Use interaction_summary param. Returns {"id": "uuid"}.
-2. record_interaction: Call IMMEDIATELY after upsert_contact. You MUST pass contact_id = the exact "id" string from the upsert_contact result. Pass summary = interaction_summary.
-3. decide_follow_up: Decide if a follow-up should be scheduled. If the interaction mentions a specific time, use it. Otherwise default to 2 days.
-4. schedule_follow_up: Schedule follow-up on calendar. Use contact_name and summary. Pass scheduled_time if specified.
-5. decide_meeting: Decide if a meeting needs to be scheduled based on the interaction.
-6. schedule_meeting: Schedule meeting. If meeting_time in prompt, use it. Else use first available slot (5PM-10PM Pacific).
-7. decide_todo: Decide if a TODO should be created from action items in the interaction.
-8. create_todo: Create TODO with title and optional description. Set created_by_agent=true.
-9. get_calendar_free_slots: Call when you need to find available slots (e.g. before schedule_meeting with no time).
+Tools:
+1. upsert_contact: Always call first. Returns {"id": "uuid"}.
+2. record_interaction: Call IMMEDIATELY after upsert_contact. Pass contact_id from upsert_contact result.
+3. schedule_follow_up: Schedule follow-up. Pass scheduled_time if specified (e.g. "week of March 16 2026").
+4. schedule_meeting: Schedule meeting. Pass scheduled_time: exact datetime, or "week of March 16 2026" for flexible scheduling.
+5. create_todo: Create TODO. Set created_by_agent=true.
+6. get_calendar_free_slots: Get slots for one date (YYYY-MM-DD, today, tomorrow).
+7. get_calendar_free_slots_in_range: Get slots across dates. Use for "week of X" or date ranges.
 
-Always upsert_contact and record_interaction. Then decide and execute follow_up, meeting, todo as appropriate.
-Log your reasoning briefly in the response.
+Always upsert_contact and record_interaction. Then schedule follow_up/meeting/todo as appropriate.
 """
 
 TOOLS = [
@@ -91,7 +93,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "schedule_meeting",
-            "description": "Schedule meeting. Use first available 5PM-10PM Pacific slot if no time given.",
+            "description": "Schedule meeting. Pass scheduled_time: '2026-03-18 18:00', 'tomorrow 6pm', or 'week of March 16 2026' for flexible week scheduling. Tool finds first free slot to avoid conflicts.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -124,13 +126,29 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_calendar_free_slots",
-            "description": "Get available slots between 5PM-10PM Pacific",
+            "description": "Get available slots for one date (5PM-10PM Pacific). date: YYYY-MM-DD, today, or tomorrow.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "date": {"type": "string"},
                     "duration_minutes": {"type": "integer"},
                 },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_calendar_free_slots_in_range",
+            "description": "Get slots across a date range. Use when user says 'week of March 16' or 'sometime in the week of X'. start_date and end_date: YYYY-MM-DD or 'March 16 2026'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string"},
+                    "end_date": {"type": "string"},
+                    "duration_minutes": {"type": "integer"},
+                },
+                "required": ["start_date", "end_date"],
             },
         },
     },

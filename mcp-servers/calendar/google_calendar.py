@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 import pytz
@@ -123,6 +123,44 @@ def get_free_slots(
         current += slot_duration
 
     return slots[:20]  # Limit to 20 slots
+
+
+def get_free_slots_in_range(
+    service,
+    calendar_id: str = "primary",
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    start_hour: int = 17,
+    end_hour: int = 22,
+    duration_minutes: int = 10,
+    max_slots: int = 20,
+) -> list[dict]:
+    """Get free slots across a date range (e.g. week of March 16)."""
+    now = datetime.now(PACIFIC).date()
+    if start_date is None:
+        start_date = now
+    if end_date is None:
+        end_date = start_date
+    if end_date < start_date:
+        end_date = start_date
+    # Cap range to 14 days
+    if (end_date - start_date).days > 14:
+        end_date = start_date + timedelta(days=14)
+
+    all_slots = []
+    current = start_date
+    while current <= end_date and len(all_slots) < max_slots:
+        day_slots = get_free_slots(
+            service, calendar_id, date=current,
+            start_hour=start_hour, end_hour=end_hour,
+            duration_minutes=duration_minutes,
+        )
+        for s in day_slots:
+            all_slots.append(s)
+            if len(all_slots) >= max_slots:
+                break
+        current += timedelta(days=1)
+    return all_slots[:max_slots]
 
 
 def schedule_event(

@@ -24,7 +24,12 @@ class ToolExecutor:
             return await self._upsert_contact(args)
         if tool_name == "record_interaction":
             return await self._record_interaction(args)
-        if tool_name in ("schedule_follow_up", "schedule_meeting", "get_calendar_free_slots"):
+        if tool_name in (
+            "schedule_follow_up",
+            "schedule_meeting",
+            "get_calendar_free_slots",
+            "get_calendar_free_slots_in_range",
+        ):
             return await self._call_calendar_mcp(tool_name, args)
         if tool_name == "create_todo":
             return await self._create_todo(args)
