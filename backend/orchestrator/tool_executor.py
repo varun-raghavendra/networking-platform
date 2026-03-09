@@ -89,6 +89,7 @@ class ToolExecutor:
                 description=args.get("description"),
                 contact_id=UUID(args["contact_id"]) if args.get("contact_id") else None,
                 created_by_agent=True,
+                priority=args.get("priority", "medium"),
             )
             await audit.log_audit(
                 session,

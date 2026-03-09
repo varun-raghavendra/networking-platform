@@ -18,15 +18,17 @@ async def create_todo(
     contact_id: Optional[UUID] = None,
     due_date: Optional[datetime] = None,
     created_by_agent: bool = False,
+    priority: str = "medium",
 ) -> dict:
     """Create a TODO item."""
     todo_id = uuid4()
     now = datetime.utcnow()
+    p = priority if priority in ("high", "medium", "low") else "medium"
 
     await session.execute(
         text(
-            "INSERT INTO todos (id, title, description, contact_id, due_date, status, created_by_agent, created_at, updated_at, metadata) "
-            "VALUES (:id, :title, :desc, :contact_id, :due_date, 'pending', :by_agent, :now, :now, '{}')"
+            "INSERT INTO todos (id, title, description, contact_id, due_date, status, created_by_agent, created_at, updated_at, priority, metadata) "
+            "VALUES (:id, :title, :desc, :contact_id, :due_date, 'pending', :by_agent, :now, :now, :priority, '{}')"
         ),
         {
             "id": todo_id,
@@ -36,10 +38,25 @@ async def create_todo(
             "due_date": due_date,
             "by_agent": created_by_agent,
             "now": now,
+            "priority": p,
         },
     )
     logger.info("Created TODO %s: %s", todo_id, title)
     return {"id": str(todo_id), "title": title, "status": "pending"}
+
+
+def _todo_order_clause(sort: str) -> str:
+    if sort == "created_asc":
+        return "t.created_at ASC"
+    if sort == "created_desc":
+        return "t.created_at DESC"
+    if sort == "priority_desc":
+        return "CASE t.priority WHEN 'low' THEN 0 WHEN 'medium' THEN 1 WHEN 'high' THEN 2 ELSE 1 END DESC, t.created_at ASC"
+    return (
+        "CASE WHEN t.status = 'pending' AND (t.priority = 'high' OR t.created_at < NOW() - INTERVAL '7 days') THEN 0 "
+        "WHEN t.status = 'pending' AND t.priority = 'medium' THEN 1 "
+        "WHEN t.status = 'pending' AND t.priority = 'low' THEN 2 ELSE 3 END, t.created_at ASC"
+    )
 
 
 async def list_todos(
@@ -47,6 +64,7 @@ async def list_todos(
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    sort: str = "priority_asc",
 ) -> tuple[list[dict], int]:
     """List TODO items for dashboard."""
     where = "1=1"
@@ -54,13 +72,14 @@ async def list_todos(
     if status:
         where = "status = :status"
         params["status"] = status
+    order = _todo_order_clause(sort)
 
     r = await session.execute(
         text(
             f"SELECT t.id, t.title, t.description, t.contact_id, t.due_date, t.status, "
-            f"t.created_at, c.full_name as contact_name FROM todos t "
+            f"t.priority, t.created_at, c.full_name as contact_name FROM todos t "
             f"LEFT JOIN contacts c ON t.contact_id = c.id WHERE {where} "
-            f"ORDER BY t.created_at DESC LIMIT :limit OFFSET :offset"
+            f"ORDER BY {order} LIMIT :limit OFFSET :offset"
         ),
         params,
     )
@@ -81,6 +100,7 @@ async def update_todo(
     status: Optional[str] = None,
     title: Optional[str] = None,
     description: Optional[str] = None,
+    priority: Optional[str] = None,
 ) -> Optional[dict]:
     """Update a TODO item."""
     updates = ["updated_at = :now"]
@@ -94,6 +114,9 @@ async def update_todo(
     if description is not None:
         updates.append("description = :description")
         params["description"] = description
+    if priority is not None and priority in ("high", "medium", "low"):
+        updates.append("priority = :priority")
+        params["priority"] = priority
 
     await session.execute(
         text(f"UPDATE todos SET {', '.join(updates)} WHERE id = :id"), params

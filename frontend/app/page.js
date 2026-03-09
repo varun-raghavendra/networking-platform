@@ -137,6 +137,7 @@ function WarmContactsTab() {
   const [reminders, setReminders] = useState([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('last_contacted_desc')
   const [total, setTotal] = useState(0)
 
   const fetchContacts = async () => {
@@ -144,6 +145,7 @@ function WarmContactsTab() {
     try {
       const url = new URL('/api/contacts', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
       if (search) url.searchParams.set('search', search)
+      url.searchParams.set('sort', sort)
       const res = await fetch(url)
       const data = await res.json()
       setContacts(data.contacts || [])
@@ -168,7 +170,7 @@ function WarmContactsTab() {
   useEffect(() => {
     fetchContacts()
     fetchReminders()
-  }, [])
+  }, [sort])
 
   const exportCsv = () => {
     window.open((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/export/contacts', '_blank')
@@ -196,6 +198,13 @@ function WarmContactsTab() {
           onKeyDown={(e) => e.key === 'Enter' && fetchContacts()}
           className={styles.search}
         />
+        <select value={sort} onChange={(e) => setSort(e.target.value)} className={styles.select}>
+          <option value="last_contacted_desc">Last contacted (newest first)</option>
+          <option value="last_contacted_asc">Last contacted (oldest first)</option>
+          <option value="follow_up_asc">Follow up (soonest first)</option>
+          <option value="follow_up_desc">Follow up (latest first)</option>
+          <option value="name_asc">Name (A–Z)</option>
+        </select>
         <button onClick={fetchContacts} disabled={loading} className={styles.btn}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
@@ -234,16 +243,18 @@ function TodosTab() {
   const [todos, setTodos] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('pending')
+  const [sort, setSort] = useState('priority_asc')
 
   useEffect(() => {
     fetchTodos()
-  }, [filter])
+  }, [filter, sort])
 
   const fetchTodos = async () => {
     setLoading(true)
     try {
       const url = new URL('/api/todos', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
       if (filter !== 'all') url.searchParams.set('status', filter)
+      url.searchParams.set('sort', sort)
       const res = await fetch(url)
       const data = await res.json()
       setTodos(data.todos || [])
@@ -254,18 +265,20 @@ function TodosTab() {
     }
   }
 
-  const markDone = async (id) => {
+  const updateTodo = async (id, updates) => {
     try {
       await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + `/api/todos/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'done' }),
+        body: JSON.stringify(updates),
       })
       fetchTodos()
     } catch (e) {
       console.error(e)
     }
   }
+
+  const markDone = (id) => updateTodo(id, { status: 'done' })
 
   const exportCsv = () => {
     window.open((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/export/todos', '_blank')
@@ -279,25 +292,51 @@ function TodosTab() {
           <option value="done">Done</option>
           <option value="all">All</option>
         </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value)} className={styles.select}>
+          <option value="priority_asc">Priority (high first)</option>
+          <option value="priority_desc">Priority (low first)</option>
+          <option value="created_asc">Oldest first</option>
+          <option value="created_desc">Newest first</option>
+        </select>
         <button onClick={fetchTodos} disabled={loading} className={styles.btn}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
         <button onClick={exportCsv} className={styles.btnSecondary}>Export CSV</button>
       </div>
       <ul className={styles.todoList}>
-        {todos.map((t) => (
-          <li key={t.id} className={styles.todoItem}>
-            <div>
-              <strong>{t.title}</strong>
-              {t.description && <p className={styles.todoDesc}>{t.description}</p>}
-              {t.contact_name && <span className={styles.todoContact}>{t.contact_name}</span>}
-            </div>
-            {t.status === 'pending' && (
-              <button onClick={() => markDone(t.id)} className={styles.btnSmall}>Done</button>
-            )}
-            {t.status === 'done' && <span className={styles.badge}>Done</span>}
-          </li>
-        ))}
+        {todos.map((t) => {
+          const daysSince = t.created_at ? Math.floor((Date.now() - new Date(t.created_at)) / (1000 * 60 * 60 * 24)) : null
+          const effectivePriority = (t.status === 'pending' && daysSince != null && daysSince >= 7) ? 'high' : (t.priority || 'medium')
+          return (
+            <li key={t.id} className={styles.todoItem}>
+              <div>
+                <div>
+                  <select
+                    value={t.priority || 'medium'}
+                    onChange={(e) => updateTodo(t.id, { priority: e.target.value })}
+                    className={`${styles.select} ${effectivePriority === 'high' ? styles.prioritySelectHigh : effectivePriority === 'low' ? styles.prioritySelectLow : styles.prioritySelectMedium}`}
+                    style={{ width: 'auto', marginRight: 8 }}
+                  >
+                    <option value="high">high</option>
+                    <option value="medium">medium</option>
+                    <option value="low">low</option>
+                  </select>
+                  <strong>{t.title}</strong>
+                  {daysSince != null && <span className={styles.todoDays}> · {daysSince}d ago</span>}
+                  {effectivePriority !== (t.priority || 'medium') && (
+                    <span className={styles.todoDays} title="Auto-elevated (7+ days old)"> ↑</span>
+                  )}
+                </div>
+                {t.description && <p className={styles.todoDesc}>{t.description}</p>}
+                {t.contact_name && <span className={styles.todoContact}>{t.contact_name}</span>}
+              </div>
+              {t.status === 'pending' && (
+                <button onClick={() => markDone(t.id)} className={styles.btnSmall}>Done</button>
+              )}
+              {t.status === 'done' && <span className={styles.badge}>Done</span>}
+            </li>
+          )
+        })}
       </ul>
       {!loading && todos.length === 0 && (
         <p className={styles.empty}>No TODOs. Create via Input Prompt or manually.</p>

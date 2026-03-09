@@ -228,9 +228,14 @@ async def list_contacts(
             "OR co.name ILIKE :search_pattern"
         )
 
-    order = "last_contacted_at DESC NULLS LAST"
-    if sort == "name_asc":
-        order = "full_name ASC"
+    order_map = {
+        "last_contacted_desc": "c.last_contacted_at DESC NULLS LAST",
+        "last_contacted_asc": "c.last_contacted_at ASC NULLS FIRST",
+        "follow_up_desc": "c.next_follow_up_at DESC NULLS LAST",
+        "follow_up_asc": "c.next_follow_up_at ASC NULLS FIRST",
+        "name_asc": "c.full_name ASC",
+    }
+    order = order_map.get(sort, "c.last_contacted_at DESC NULLS LAST")
 
     r = await session.execute(
         text(

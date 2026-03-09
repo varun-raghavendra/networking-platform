@@ -58,7 +58,7 @@ async def export_todos_csv(session: AsyncSession) -> str:
     """Export TODOs as CSV string."""
     r = await session.execute(
         text(
-            "SELECT t.title, t.description, t.status, t.due_date, t.created_at, c.full_name as contact_name "
+            "SELECT t.title, t.description, t.status, t.priority, t.due_date, t.created_at, c.full_name as contact_name "
             "FROM todos t LEFT JOIN contacts c ON t.contact_id = c.id ORDER BY t.created_at DESC"
         )
     )
@@ -66,7 +66,7 @@ async def export_todos_csv(session: AsyncSession) -> str:
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Title", "Description", "Status", "Due Date", "Created At", "Contact"])
+    writer.writerow(["Title", "Description", "Status", "Priority", "Due Date", "Created At", "Contact"])
     for row in rows:
         r = row._mapping
         writer.writerow(
@@ -74,6 +74,7 @@ async def export_todos_csv(session: AsyncSession) -> str:
                 r.get("title", ""),
                 r.get("description", ""),
                 r.get("status", ""),
+                r.get("priority", "medium"),
                 r.get("due_date") or "",
                 r.get("created_at") or "",
                 r.get("contact_name", ""),

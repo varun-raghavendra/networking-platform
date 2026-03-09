@@ -175,6 +175,66 @@
   color: #1d9bf0;
 }
 
+.todoDays {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: #8b98a5;
+}
+
+.priorityHigh {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.priorityMedium {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #f59e0b;
+  color: #fff;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.priorityLow {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #6b7280;
+  color: #fff;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* Priority colors for the editable select */
+.prioritySelectHigh {
+  background: #ef4444 !important;
+  color: #fff !important;
+  border-color: #ef4444 !important;
+}
+.prioritySelectMedium {
+  background: #f59e0b !important;
+  color: #fff !important;
+  border-color: #f59e0b !important;
+}
+.prioritySelectLow {
+  background: #6b7280 !important;
+  color: #fff !important;
+  border-color: #6b7280 !important;
+}
+
 .badge {
   font-size: 0.8rem;
   color: #00ba7c;

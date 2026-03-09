@@ -82,6 +82,7 @@ class TodoCreateInput(BaseModel):
     description: str | None = None
     contact_id: str | None = None
     created_by_agent: bool = False
+    priority: str = "medium"
 
 
 # --- Public API ---
@@ -175,6 +176,7 @@ async def process_prompt(input: PromptInput):
                     "title": item["title"],
                     "description": item.get("description"),
                     "contact_id": contact_id,
+                    "priority": item.get("priority", "medium"),
                 })
                 result.setdefault("actions", []).append({"type": "create_todo", "success": "Error" not in str(tr), "details": {"result": tr}})
             except Exception as e:
@@ -271,10 +273,11 @@ async def list_todos(
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    sort: str = "priority_asc",
 ):
-    """List TODO items."""
+    """List TODO items. sort: priority_asc, priority_desc, created_asc, created_desc"""
     async with get_session() as session:
-        rows, total = await todos.list_todos(session, status, limit, offset)
+        rows, total = await todos.list_todos(session, status, limit, offset, sort)
         return {"todos": rows, "total": total}
 
 
@@ -288,19 +291,21 @@ async def create_todo_manual(input: TodoCreateInput):
             description=input.description,
             contact_id=UUID(input.contact_id) if input.contact_id else None,
             created_by_agent=input.created_by_agent,
+            priority=input.priority,
         )
 
 
 class TodoUpdateInput(BaseModel):
     status: str | None = None
+    priority: str | None = None
 
 
 @app.patch("/api/todos/{todo_id}")
 async def update_todo(todo_id: UUID, input: TodoUpdateInput | None = None):
-    """Update TODO (e.g. mark done)."""
-    status = (input or TodoUpdateInput()).status
+    """Update TODO (e.g. mark done, change priority)."""
+    inp = input or TodoUpdateInput()
     async with get_session() as session:
-        return await todos.update_todo(session, todo_id, status=status)
+        return await todos.update_todo(session, todo_id, status=inp.status, priority=inp.priority)
 
 
 @app.get("/api/export/contacts")
@@ -376,6 +381,7 @@ async def internal_create_todo(input: TodoCreateInput):
             description=input.description,
             contact_id=UUID(input.contact_id) if input.contact_id else None,
             created_by_agent=input.created_by_agent,
+            priority=input.priority,
         )
 
 

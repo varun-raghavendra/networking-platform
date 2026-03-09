@@ -9,16 +9,30 @@ from config import get_settings
 
 logger = logging.getLogger(__name__)
 
-TODO_PROMPT = """You are a TODO extraction agent. Given an interaction summary between the user and a contact, extract actionable TODO items.
+TODO_PROMPT = """You are a TODO extraction agent. Given an interaction summary between the user and a contact, extract actionable TODO items with priorities.
 
 Return a JSON array of objects. Each object has:
 - title: Short actionable title (required)
 - description: Optional longer description
+- priority: "high", "medium", or "low" (required). Use these rules:
+  * high: User said high priority; apply to jobs they suggested; follow-up on application; user asked to apply
+  * medium: Find jobs at their company; most other actionable items; use judgment
+  * low: Check back with them after some time; simple catch-ups; informal follow-ups
 
 If there are no clear action items, return an empty array [].
 
-Example input: "Discussed open roles at Nutanix. I need to search for roles relevant to my profile."
-Example output: [{"title": "Search for relevant roles at Nutanix", "description": "Find roles matching my profile"}]
+Examples:
+Input: "He said to apply for the ML engineer role at Google"
+Output: [{"title": "Apply for ML engineer role at Google", "priority": "high"}]
+
+Input: "Search for roles at Nutanix relevant to my profile"
+Output: [{"title": "Search for roles at Nutanix", "description": "Find roles matching my profile", "priority": "medium"}]
+
+Input: "Let's catch up next week"
+Output: [{"title": "Catch up with contact", "priority": "low"}]
+
+Input: "Follow up on my application to the PM role"
+Output: [{"title": "Follow up on PM role application", "priority": "high"}]
 
 Return ONLY valid JSON, no other text."""
 
@@ -51,9 +65,13 @@ class TodoAgent:
             result = []
             for item in parsed:
                 if isinstance(item, dict) and item.get("title"):
+                    p = str(item.get("priority", "medium")).lower()
+                    if p not in ("high", "medium", "low"):
+                        p = "medium"
                     result.append({
                         "title": str(item["title"]),
                         "description": str(item["description"]) if item.get("description") else None,
+                        "priority": p,
                     })
             return result
         except Exception as e:
