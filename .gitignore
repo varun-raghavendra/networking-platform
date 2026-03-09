@@ -36,6 +36,10 @@ Thumbs.db
 # Docker
 *.log
 
+# Database backups
+backups/
+*.sql.gz
+
 # Test / coverage
 .pytest_cache/
 .coverage

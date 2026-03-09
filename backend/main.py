@@ -15,6 +15,7 @@ from database import get_session, run_migrations
 from orchestrator.agent import OrchestratorAgent
 from orchestrator.followup_agent import FollowupAgent
 from orchestrator.meeting_agent import MeetingAgent
+from orchestrator.summary_agent import SummaryAgent
 from orchestrator.todo_agent import TodoAgent
 from orchestrator.tool_executor import ToolExecutor
 from services import audit, contacts, export_service, todos
@@ -159,6 +160,13 @@ async def process_prompt(input: PromptInput):
                 except Exception as e:
                     logger.exception("schedule_meeting failed: %s", e)
                     result.setdefault("actions", []).append({"type": "schedule_meeting", "success": False, "details": {"error": str(e)}})
+        summary_agent = SummaryAgent()
+        one_line = await summary_agent.get_one_line_summary(input.interaction_summary)
+        if one_line:
+            async with get_session() as session:
+                await contacts.update_contact_fields(
+                    session, UUID(contact_id), last_interaction_summary=one_line
+                )
         todo_agent = TodoAgent()
         todo_items = await todo_agent.extract_todos(input.interaction_summary)
         for item in todo_items:

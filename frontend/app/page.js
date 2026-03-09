@@ -113,7 +113,7 @@ function ContactRow({ contact, getWarmthStyle, onSaved }) {
             title="Last contacted"
           />
         ) : (
-          (contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleString() : '-')
+          (contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-')
         )}
       </td>
       <td>{followUpDisplay}</td>

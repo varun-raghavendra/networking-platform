@@ -94,5 +94,22 @@ services:
     depends_on:
       - backend
 
+  backup:
+    build:
+      context: .
+      dockerfile: backup/Dockerfile
+    environment:
+      PGHOST: postgres
+      PGUSER: user
+      PGPASSWORD: password
+      PGDATABASE: networking
+      BACKUP_DIR: /backups
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  backup_data:

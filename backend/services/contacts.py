@@ -310,6 +310,7 @@ async def update_contact_fields(
     phone: Optional[str] = None,
     email: Optional[str] = None,
     last_contacted_at: Optional[str] = None,
+    last_interaction_summary: Optional[str] = None,
 ) -> Optional[dict]:
     """Update contact fields including last_contacted_at."""
     from sqlalchemy import text
@@ -330,6 +331,9 @@ async def update_contact_fields(
         if parsed:
             updates.append("last_contacted_at = :last_contacted_at")
             params["last_contacted_at"] = parsed
+    if last_interaction_summary is not None:
+        updates.append("last_interaction_summary = :last_interaction_summary")
+        params["last_interaction_summary"] = (last_interaction_summary or "")[:200]
 
     if len(updates) == 1:
         return await get_contact(session, contact_id)
