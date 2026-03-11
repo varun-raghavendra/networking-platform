@@ -191,6 +191,36 @@
   border-left: 4px solid #8b98a5;
 }
 
+.summariesList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.summaryCard {
+  background: #1a1f26;
+  border: 1px solid #2f3336;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.summaryHeader {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.summaryMeta {
+  color: #8b98a5;
+  font-weight: 400;
+}
+
+.summaryParagraph {
+  margin: 0;
+  line-height: 1.6;
+  color: #e7e9ea;
+  font-size: 0.95rem;
+}
+
 .todoList {
   list-style: none;
   padding: 0;

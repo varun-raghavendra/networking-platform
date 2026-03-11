@@ -163,10 +163,14 @@ async def process_prompt(input: PromptInput):
                     result.setdefault("actions", []).append({"type": "schedule_meeting", "success": False, "details": {"error": str(e)}})
         summary_agent = SummaryAgent()
         one_line = await summary_agent.get_one_line_summary(input.interaction_summary)
-        if one_line:
+        paragraph = await summary_agent.get_paragraph_summary(input.interaction_summary)
+        if one_line or paragraph:
             async with get_session() as session:
                 await contacts.update_contact_fields(
-                    session, UUID(contact_id), last_interaction_summary=one_line
+                    session,
+                    UUID(contact_id),
+                    last_interaction_summary=one_line,
+                    last_interaction_context=paragraph,
                 )
         todo_agent = TodoAgent()
         todo_items = await todo_agent.extract_todos(input.interaction_summary)

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import styles from './page.module.css'
 
-const TABS = ['Warm Contacts', 'TODO', 'Input Prompt']
+const TABS = ['Warm Contacts', 'TODO', 'Summaries', 'Input Prompt']
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState(0)
@@ -27,7 +27,8 @@ export default function Home() {
       <main className={styles.main}>
         {activeTab === 0 && <WarmContactsTab />}
         {activeTab === 1 && <TodosTab />}
-        {activeTab === 2 && <InputPromptTab />}
+        {activeTab === 2 && <SummariesTab />}
+        {activeTab === 3 && <InputPromptTab />}
       </main>
     </div>
   )
@@ -395,6 +396,57 @@ function TodosTab() {
       </ul>
       {!loading && todos.length === 0 && (
         <p className={styles.empty}>No TODOs. Create via Input Prompt or manually.</p>
+      )}
+    </div>
+  )
+}
+
+function SummariesTab() {
+  const [contacts, setContacts] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const fetchContacts = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/contacts?limit=100&sort=name_asc')
+      const d = await res.json()
+      setContacts(d.contacts || [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchContacts() }, [])
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.toolbar}>
+        <button onClick={fetchContacts} disabled={loading} className={styles.btn}>
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+      <div className={styles.summariesList}>
+        {contacts.map((c) => (
+          <div key={c.id} className={styles.summaryCard}>
+            <div className={styles.summaryHeader}>
+              <strong>{c.full_name}</strong>
+              {c.company_name && <span className={styles.summaryMeta}> · {c.company_name}</span>}
+              {c.last_contacted_at && (
+                <span className={styles.summaryMeta}>
+                  {' '}· Last contacted {new Date(c.last_contacted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </div>
+            <p className={styles.summaryParagraph}>
+              {c.last_interaction_context || c.last_interaction_summary || 'No interaction context yet.'}
+            </p>
+          </div>
+        ))}
+      </div>
+      {!loading && contacts.length === 0 && (
+        <p className={styles.empty}>No contacts yet. Add one via the Input Prompt tab.</p>
       )}
     </div>
   )

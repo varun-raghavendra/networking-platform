@@ -240,7 +240,7 @@ async def list_contacts(
     r = await session.execute(
         text(
             f"SELECT c.id, c.full_name, c.country, c.last_contacted_at, "
-            f"c.last_interaction_summary, c.next_follow_up_at, co.name as company_name FROM contacts c "
+            f"c.last_interaction_summary, c.last_interaction_context, c.next_follow_up_at, co.name as company_name FROM contacts c "
             f"LEFT JOIN companies co ON c.company_id = co.id WHERE {where} "
             f"ORDER BY {order} LIMIT :limit OFFSET :offset"
         ),
@@ -326,6 +326,7 @@ async def update_contact_fields(
     email: Optional[str] = None,
     last_contacted_at: Optional[str] = None,
     last_interaction_summary: Optional[str] = None,
+    last_interaction_context: Optional[str] = None,
 ) -> Optional[dict]:
     """Update contact fields including last_contacted_at."""
     from sqlalchemy import text
@@ -349,6 +350,9 @@ async def update_contact_fields(
     if last_interaction_summary is not None:
         updates.append("last_interaction_summary = :last_interaction_summary")
         params["last_interaction_summary"] = (last_interaction_summary or "")[:200]
+    if last_interaction_context is not None:
+        updates.append("last_interaction_context = :last_interaction_context")
+        params["last_interaction_context"] = (last_interaction_context or "")[:2000]
 
     if len(updates) == 1:
         return await get_contact(session, contact_id)
