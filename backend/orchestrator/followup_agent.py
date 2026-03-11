@@ -24,6 +24,7 @@ You must return a JSON object with exactly one key:
   Use format "YYYY-MM-DD HH:MM" (e.g. "2026-03-12 18:00") for specificity.
   Or natural language: "tomorrow 6pm", "in 2 days", "week of March 16 2026" - these will be interpreted relative to the current date.
   Prefer 5PM-10PM Mountain when no specific time given.
+  DEFAULT: When the user has NOT specified a follow-up time, schedule within 24 hours max (e.g. tomorrow at 6pm, or same-day evening if still in window).
   If the user provided follow_up_time (e.g. "in 2 days"), use that.
   If no follow-up is needed, set scheduled_time to null.
 
@@ -57,7 +58,7 @@ Meeting time (if any): {meeting_time or 'not specified'}
 Meeting context: {meeting_context or 'none'}
 Last contacted: {last_contacted or 'not specified'}
 
-Determine the next follow-up date and time. MUST be in the future. Use Mountain Time. Return JSON with scheduled_time."""
+Determine the next follow-up date and time. MUST be in the future. Use Mountain Time. When no follow-up hint is given, default to within 24 hours (max). Return JSON with scheduled_time."""
         try:
             response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
