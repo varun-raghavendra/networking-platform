@@ -62,6 +62,7 @@ def _todo_order_clause(sort: str) -> str:
 async def list_todos(
     session: AsyncSession,
     status: Optional[str] = None,
+    contact_id: Optional[UUID] = None,
     limit: int = 50,
     offset: int = 0,
     sort: str = "priority_asc",
@@ -70,8 +71,11 @@ async def list_todos(
     where = "1=1"
     params = {"limit": limit, "offset": offset}
     if status:
-        where = "status = :status"
+        where = f"{where} AND t.status = :status"
         params["status"] = status
+    if contact_id:
+        where = f"{where} AND t.contact_id = :contact_id"
+        params["contact_id"] = contact_id
     order = _todo_order_clause(sort)
 
     r = await session.execute(
@@ -87,7 +91,7 @@ async def list_todos(
 
     count_params = {k: v for k, v in params.items() if k not in ("limit", "offset")}
     count_r = await session.execute(
-        text(f"SELECT COUNT(*) FROM todos WHERE {where}"), count_params
+        text(f"SELECT COUNT(*) FROM todos t WHERE {where}"), count_params
     )
     total = count_r.scalar() or 0
 

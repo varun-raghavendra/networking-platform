@@ -281,13 +281,14 @@ async def get_reminders(days: int = 90):
 @app.get("/api/todos")
 async def list_todos(
     status: str | None = None,
+    contact_id: UUID | None = None,
     limit: int = 50,
     offset: int = 0,
     sort: str = "priority_asc",
 ):
     """List TODO items. sort: priority_asc, priority_desc, created_asc, created_desc"""
     async with get_session() as session:
-        rows, total = await todos.list_todos(session, status, limit, offset, sort)
+        rows, total = await todos.list_todos(session, status, contact_id, limit, offset, sort)
         return {"todos": rows, "total": total}
 
 

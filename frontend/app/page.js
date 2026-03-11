@@ -274,19 +274,35 @@ function WarmContactsTab() {
 
 function TodosTab() {
   const [todos, setTodos] = useState([])
+  const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('pending')
   const [sort, setSort] = useState('priority_asc')
+  const [contactFilter, setContactFilter] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/contacts?limit=100&sort=name_asc')
+        const d = await res.json()
+        setContacts(d.contacts || [])
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    load()
+  }, [])
 
   useEffect(() => {
     fetchTodos()
-  }, [filter, sort])
+  }, [filter, sort, contactFilter])
 
   const fetchTodos = async () => {
     setLoading(true)
     try {
       const url = new URL('/api/todos', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
       if (filter !== 'all') url.searchParams.set('status', filter)
+      if (contactFilter) url.searchParams.set('contact_id', contactFilter)
       url.searchParams.set('sort', sort)
       const res = await fetch(url)
       const data = await res.json()
@@ -324,6 +340,12 @@ function TodosTab() {
           <option value="pending">Pending</option>
           <option value="done">Done</option>
           <option value="all">All</option>
+        </select>
+        <select value={contactFilter} onChange={(e) => setContactFilter(e.target.value)} className={styles.select}>
+          <option value="">All contacts</option>
+          {contacts.map((c) => (
+            <option key={c.id} value={c.id}>{c.full_name}</option>
+          ))}
         </select>
         <select value={sort} onChange={(e) => setSort(e.target.value)} className={styles.select}>
           <option value="priority_asc">Priority (high first)</option>
@@ -399,7 +421,7 @@ function InputPromptTab() {
   const fetchContacts = async () => {
     setContactsLoading(true)
     try {
-      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/contacts?limit=100')
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/contacts?limit=100&sort=name_asc')
       const d = await res.json()
       if (!res.ok) {
         console.error('Failed to fetch contacts:', d)
