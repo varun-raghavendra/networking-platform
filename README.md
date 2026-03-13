@@ -2,9 +2,22 @@
 
 An agentic platform for managing interactions with your professional network. The system processes natural language prompts about interactions and automatically updates contacts, schedules follow-ups, creates meetings, and manages TODOs.
 
+## Screenshots
+
+| Tab | Screenshot |
+|-----|------------|
+| Warm Contacts | [warm-contacts.png](screenshots/warm-contacts.png) |
+| TODO | [todo.png](screenshots/todo.png) |
+| Summaries | [summaries.png](screenshots/summaries.png) |
+| Input Prompt | [input-prompt.png](screenshots/input-prompt.png) |
+
+**To capture manually:** Run `docker compose up`, open http://localhost:3000, switch to each tab, and save screenshots to `screenshots/` with the filenames above.
+
+**To capture automatically:** With the app running, install Playwright (`npm install playwright`) and run `node scripts/capture_screenshots.js`.
+
 ## Architecture
 
-- **Frontend**: Next.js with 3 tabs (Warm Contacts, TODO, Input Prompt)
+- **Frontend**: Next.js with 4 tabs (Warm Contacts, TODO, Summaries, Input Prompt)
 - **Backend**: FastAPI (API + Orchestrator)
 - **MCP Servers**: FastMCP - Calendar, Contacts, Todos (modular)
 - **Database**: PostgreSQL

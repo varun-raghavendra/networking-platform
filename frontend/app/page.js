@@ -404,11 +404,16 @@ function TodosTab() {
 function SummariesTab() {
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
 
   const fetchContacts = async () => {
     setLoading(true)
     try {
-      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/contacts?limit=100&sort=name_asc')
+      const url = new URL('/api/contacts', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+      url.searchParams.set('limit', '100')
+      url.searchParams.set('sort', 'name_asc')
+      if (search) url.searchParams.set('search', search)
+      const res = await fetch(url)
       const d = await res.json()
       setContacts(d.contacts || [])
     } catch (e) {
@@ -423,6 +428,13 @@ function SummariesTab() {
   return (
     <div className={styles.tabContent}>
       <div className={styles.toolbar}>
+        <input
+          placeholder="Filter by name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && fetchContacts()}
+          className={styles.search}
+        />
         <button onClick={fetchContacts} disabled={loading} className={styles.btn}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
