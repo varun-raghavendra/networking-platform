@@ -219,6 +219,21 @@ async def process_prompt(input: PromptInput):
     return {"id": "prompt-1", **result}
 
 
+@app.get("/api/follow-ups")
+async def list_follow_ups(
+    date: str | None = None,
+):
+    """List follow-up items for a given date (YYYY-MM-DD). Default: today in Mountain Time."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    mt = ZoneInfo("America/Denver")
+    today_str = datetime.now(mt).strftime("%Y-%m-%d")
+    on_date = date or today_str
+    async with get_session() as session:
+        rows = await contacts.list_follow_ups_by_date(session, on_date)
+        return {"follow_ups": rows, "date": on_date}
+
+
 @app.get("/api/contacts")
 async def list_contacts(
     limit: int = Query(50, le=100),

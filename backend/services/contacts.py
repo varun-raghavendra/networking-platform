@@ -260,6 +260,28 @@ async def list_contacts(
     return [dict(row._mapping) for row in rows], total
 
 
+async def list_follow_ups_by_date(
+    session: AsyncSession,
+    on_date: str,
+    limit: int = 50,
+) -> list[dict]:
+    """List contacts with next_follow_up_at on the given date (YYYY-MM-DD, Mountain Time)."""
+    from sqlalchemy import text
+
+    r = await session.execute(
+        text(
+            "SELECT c.id, c.full_name, c.country, c.last_contacted_at, c.last_interaction_summary, "
+            "c.last_interaction_context, c.next_follow_up_at, co.name as company_name FROM contacts c "
+            "LEFT JOIN companies co ON c.company_id = co.id "
+            "WHERE c.next_follow_up_at IS NOT NULL "
+            "AND (c.next_follow_up_at AT TIME ZONE 'America/Denver')::date = :on_date::date "
+            "ORDER BY c.next_follow_up_at ASC LIMIT :limit"
+        ),
+        {"on_date": on_date, "limit": limit},
+    )
+    return [dict(row._mapping) for row in r.fetchall()]
+
+
 async def get_contact(session: AsyncSession, contact_id: UUID) -> Optional[dict]:
     """Get single contact by ID."""
     from sqlalchemy import text

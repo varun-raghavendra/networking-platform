@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import styles from './page.module.css'
 
-const TABS = ['Warm Contacts', 'TODO', 'Summaries', 'Input Prompt']
+const TABS = ['Warm Contacts', 'TODO', 'Summaries', 'Follow ups', 'Input Prompt']
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState(0)
@@ -28,7 +28,8 @@ export default function Home() {
         {activeTab === 0 && <WarmContactsTab />}
         {activeTab === 1 && <TodosTab />}
         {activeTab === 2 && <SummariesTab />}
-        {activeTab === 3 && <InputPromptTab />}
+        {activeTab === 3 && <FollowUpsTab />}
+        {activeTab === 4 && <InputPromptTab />}
       </main>
     </div>
   )
@@ -459,6 +460,135 @@ function SummariesTab() {
       </div>
       {!loading && contacts.length === 0 && (
         <p className={styles.empty}>No contacts yet. Add one via the Input Prompt tab.</p>
+      )}
+    </div>
+  )
+}
+
+function FollowUpsTab() {
+  const today = new Date().toISOString().slice(0, 10)
+  const [followUps, setFollowUps] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [date, setDate] = useState(today)
+  const [notesByContact, setNotesByContact] = useState({})
+  const [nextFollowUpByContact, setNextFollowUpByContact] = useState({})
+  const [submitting, setSubmitting] = useState(null)
+
+  const fetchFollowUps = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + `/api/follow-ups?date=${date}`)
+      const d = await res.json()
+      setFollowUps(d.follow_ups || [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchFollowUps() }, [date])
+
+  const handleDone = async (item) => {
+    const notes = (notesByContact[item.id] || '').trim()
+    const nextFollowUp = (nextFollowUpByContact[item.id] || 'in 2 days').trim() || 'in 2 days'
+    const interactionSummary = notes || 'Follow-up completed.'
+    setSubmitting(item.id)
+    try {
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: item.id,
+          interaction_summary: interactionSummary,
+          follow_up_time: nextFollowUp,
+          last_contacted: new Date().toISOString(),
+        }),
+      })
+      const data = await res.json()
+      if (data.status === 'completed') {
+        setNotesByContact((prev) => { const p = { ...prev }; delete p[item.id]; return p })
+        setNextFollowUpByContact((prev) => { const p = { ...prev }; delete p[item.id]; return p })
+        fetchFollowUps()
+      } else {
+        console.error('Prompt failed:', data)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSubmitting(null)
+    }
+  }
+
+  const setNotes = (contactId, value) =>
+    setNotesByContact((prev) => ({ ...prev, [contactId]: value }))
+  const setNextFollowUp = (contactId, value) =>
+    setNextFollowUpByContact((prev) => ({ ...prev, [contactId]: value }))
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.toolbar}>
+        <label className={styles.followUpDateLabel}>Date</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className={styles.input}
+          style={{ width: 'auto', maxWidth: 160 }}
+        />
+        <button onClick={fetchFollowUps} disabled={loading} className={styles.btn}>
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+      <div className={styles.followUpsList}>
+        {followUps.map((item) => (
+          <div key={item.id} className={styles.followUpCard}>
+            <div className={styles.summaryHeader}>
+              <strong>{item.full_name}</strong>
+              {item.company_name && <span className={styles.summaryMeta}> · {item.company_name}</span>}
+              {item.next_follow_up_at && (
+                <span className={styles.summaryMeta}>
+                  {' '}· {new Date(item.next_follow_up_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+            <p className={styles.summaryParagraph}>
+              {item.last_interaction_context || item.last_interaction_summary || 'No context.'}
+            </p>
+            <div className={styles.followUpFields}>
+              <div>
+                <label className={styles.followUpLabel}>Follow-up notes (→ TODOs)</label>
+                <textarea
+                  placeholder="What happened? Action items will become TODOs."
+                  value={notesByContact[item.id] || ''}
+                  onChange={(e) => setNotes(item.id, e.target.value)}
+                  className={styles.textarea}
+                  rows={2}
+                />
+              </div>
+              <div>
+                <label className={styles.followUpLabel}>Next follow-up</label>
+                <input
+                  type="text"
+                  placeholder="in 2 days"
+                  value={nextFollowUpByContact[item.id] ?? 'in 2 days'}
+                  onChange={(e) => setNextFollowUp(item.id, e.target.value)}
+                  className={styles.input}
+                />
+              </div>
+              <button
+                onClick={() => handleDone(item)}
+                disabled={!!submitting}
+                className={styles.btnPrimary}
+              >
+                {submitting === item.id ? 'Scheduling...' : 'Done'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {!loading && followUps.length === 0 && (
+        <p className={styles.empty}>No follow-ups scheduled for this date.</p>
       )}
     </div>
   )

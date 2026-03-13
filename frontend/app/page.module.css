@@ -221,6 +221,51 @@
   font-size: 0.95rem;
 }
 
+.followUpsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.followUpCard {
+  background: #1a1f26;
+  border: 1px solid #2f3336;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.followUpDateLabel {
+  color: #8b98a5;
+  margin-right: 0.5rem;
+}
+
+.followUpFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.followUpLabel {
+  display: block;
+  color: #8b98a5;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.textarea {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #2f3336;
+  border-radius: 6px;
+  background: #1a1f26;
+  color: #e7e9ea;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+
 .todoList {
   list-style: none;
   padding: 0;
